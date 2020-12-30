@@ -1,57 +1,41 @@
-package main
+package app
 
 import (
 	"archive/tar"
 	"compress/gzip"
 	"context"
-	"crypto/tls"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/go-logr/zapr"
-	"go.uber.org/zap"
+	"golang.org/x/oauth2"
 
 	"github.com/google/go-github/v33/github"
 )
 
-func main() {
-
-	var log logr.Logger
-
-	//context := context.Background()
-	zapLog, err := zap.NewProduction()
-	if err != nil {
-		panic(fmt.Sprintf("who watches the watchmen (%v)?", err))
-	}
-	log = zapr.NewLogger(zapLog)
-	ctx := logr.NewContext(context.Background(), log)
-
-	// creates http client if needed for a redirect
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: false},
-	}
-
-	httpClient := &http.Client{
-		Transport: tr,
-		Timeout:   time.Second * time.Duration(5),
-	}
-
+// App start the app
+func App(ctx context.Context, httpClient *http.Client, githubToken string) error {
 	// so it begins
+	log := logr.FromContext(ctx)
+
 	owner := "tektoncd"
 	repo := "cli"
 	cliName := "tkn"
 	tmpPath := "/tmp/tkn-201230"
 
-	client := github.NewClient(nil)
+	tokenService := oauth2.StaticTokenSource(
+		&oauth2.Token{AccessToken: githubToken},
+	)
+	tokenClient := oauth2.NewClient(ctx, tokenService)
+
+	client := github.NewClient(tokenClient)
 	// response gives information about my rate limit etc, nice to have but no need to do stuff. I assume I will get an error if i go over my rate limit
 	resp, _, err := client.Repositories.GetLatestRelease(ctx, owner, repo)
 	if err != nil {
-		fmt.Println("shiiiiit")
+		return err
 	}
 	pattern := "tkn_0.15.0_Linux_x86_64.tar.gz"
 	for _, asset := range resp.Assets {
@@ -61,22 +45,22 @@ func main() {
 
 			// Create the tmp folder
 			if err := makeDirectoryIfNotExists(tmpPath); err != nil {
-				log.Info("unable to stat folder")
+				// log.Info("unable to stat folder")
+				return err
 			}
 
 			rc, _, err := client.Repositories.DownloadReleaseAsset(ctx, owner, repo, *asset.ID, httpClient)
 			if err != nil {
-				log.Info("unable to download stuff")
-				return
+				return err
 			}
 
 			err = Untar(tmpPath, cliName, rc)
 			if err != nil {
-				log.Error(err, "unable to untar files")
+				return err
 			}
 		}
 	}
-
+	return nil
 }
 
 func makeDirectoryIfNotExists(path string) error {

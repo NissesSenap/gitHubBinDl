@@ -14,6 +14,7 @@ and I want a config file to manage what I download in a easy way.
 ## TODO
 
 - Support auth, this to work around the api limit & private repositories
+  - Be able to disable auth
 - Write simple instruction on how to get a GitHub token
 - If a current release exist of your cli support to save the old version
 - Enable the config file to define how to get the current version of a binary
