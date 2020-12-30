@@ -46,7 +46,6 @@ func main() {
 	repo := "cli"
 	cliName := "tkn"
 	tmpPath := "/tmp/tkn-201230"
-	//fulPathTarGz := tmpPath + "/" + cliName + ".tar.gz"
 
 	client := github.NewClient(nil)
 	// response gives information about my rate limit etc, nice to have but no need to do stuff. I assume I will get an error if i go over my rate limit
@@ -71,37 +70,11 @@ func main() {
 				return
 			}
 
-			/*
-				buf := new(bytes.Buffer)
-				buf.ReadFrom(rc)
-
-				// notice the tar.gz
-				f, err := os.OpenFile(fulPathTarGz, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0664)
-				if err != nil {
-					log.Error(err, "shiiit")
-				}
-
-				// write the file
-				buf.WriteTo(f)
-
-				//CLOSE THE FILE
-				if err := f.Close(); err != nil {
-					log.Info("unable to write file")
-					os.Exit(1)
-				}
-			*/
 			err = Untar(tmpPath, cliName, rc)
 			if err != nil {
 				log.Error(err, "unable to untar files")
 			}
 		}
-		/*
-			untar
-			chmod 755
-			move bin to correct area
-			remove tmp/asset folder
-
-		*/
 	}
 
 }
@@ -147,19 +120,13 @@ func Untar(dst string, cliName string, r io.Reader) error {
 		// the target location where the dir/file should be created
 		target := filepath.Join(dst, header.Name)
 
-		// the following switch could also be done using fi.Mode(), not sure if there
-		// a benefit of using one vs. the other.
-		// fi := header.FileInfo()
-
 		// check the file type
 		switch header.Typeflag {
 
 		// if its a dir and it doesn't exist create it
 		case tar.TypeDir:
-			if _, err := os.Stat(target); err != nil {
-				if err := os.MkdirAll(target, 0755); err != nil {
-					return err
-				}
+			if err := makeDirectoryIfNotExists(target); err != nil {
+				return err
 			}
 
 		// if it's a file create it
@@ -167,7 +134,10 @@ func Untar(dst string, cliName string, r io.Reader) error {
 			// Only write the cliFile
 			if target == cliFile {
 
-				f, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
+				/* Since I only untar the cli it self I enforce 0755
+				   else use os.FileMode(header.Mode) to get what the filed had when it was tared.
+				*/
+				f, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(0755))
 				if err != nil {
 					return err
 				}
