@@ -2,13 +2,17 @@ package app
 
 import (
 	"archive/tar"
+	"archive/zip"
+	"bytes"
 	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/NissesSenap/gitHubBinDl/pkg/config"
 
@@ -18,8 +22,11 @@ import (
 	"github.com/google/go-github/v33/github"
 )
 
+const zipExtension = ".zip"
+const gzExtension = ".gz"
+
 // App start the app
-func App(ctx context.Context, httpClient *http.Client, configItem config.Items) error {
+func App(ctx context.Context, httpClient *http.Client, configItem *config.Items) error {
 	client := github.NewClient(nil)
 
 	// If no githuBAPIToken is specified the application runs without it
@@ -37,18 +44,51 @@ func App(ctx context.Context, httpClient *http.Client, configItem config.Items) 
 		return err
 	}
 
+	// TODO create regexp
 	pattern := "tkn_0.15.0_Linux_x86_64.tar.gz"
 
-	// TODO currently hardcoded, change to for loop
-	err := downloadBin(ctx, client, httpClient, configItem.Bins[0].Owner, configItem.Bins[0].Repo, configItem.Bins[0].Cli, configItem.SaveLocation, pattern)
-	if err != nil {
-		return err
+	for i := range configItem.Bins {
+		err := downloadBin(ctx, client, httpClient, configItem.Bins[i].Owner, configItem.Bins[i].Repo, configItem.Bins[i].Cli, configItem.SaveLocation, pattern, configItem.Bins[i].NonGithubURL)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-func downloadBin(ctx context.Context, client *github.Client, httpClient *http.Client, owner, repo, cliName, saveLocation, pattern string) error {
+func downloadBin(ctx context.Context, client *github.Client, httpClient *http.Client, owner, repo, cliName, saveLocation, pattern, nonGithubURL string) error {
 	log := logr.FromContext(ctx)
+
+	log.Info(nonGithubURL)
+	if nonGithubURL != "" {
+		resp, err := httpClient.Get(nonGithubURL)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+
+		if filepath.Ext(nonGithubURL) == gzExtension {
+			untarGZ(ctx, saveLocation, cliName, resp.Body)
+			if err != nil {
+				return err
+			}
+			return nil
+		}
+
+		if filepath.Ext(nonGithubURL) == zipExtension {
+			zipRespBody, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				return err
+			}
+			err = unZIP(ctx, saveLocation, cliName, zipRespBody)
+			if err != nil {
+				return err
+			}
+			return nil
+		}
+
+		return nil
+	}
 
 	// response gives information about rate limit etc. I assume I will get an error if i go over my rate limit
 	// TODO here a log.debug would be nice...
@@ -60,15 +100,13 @@ func downloadBin(ctx context.Context, client *github.Client, httpClient *http.Cl
 		log.Info(*asset.Name)
 		// TODO turn pattern in to a simple regexp
 		if *asset.Name == pattern {
-			fmt.Println("hit")
-
 			rc, _, err := client.Repositories.DownloadReleaseAsset(ctx, owner, repo, *asset.ID, httpClient)
 			if err != nil {
 				return err
 			}
 
 			// TODO add a if looking for tar.gz or .zip
-			err = Untar(saveLocation, cliName, rc)
+			err = untarGZ(ctx, saveLocation, cliName, rc)
 			if err != nil {
 				return err
 			}
@@ -84,8 +122,9 @@ func makeDirectoryIfNotExists(path string) error {
 	return nil
 }
 
-// Untar tar.gz files and put the result in any folder you want this can be something like a /tmp/myNewFolder or /usr/local/bin
-func Untar(dst string, cliName string, r io.Reader) error {
+// untarGZ tar.gz files and put the result in any folder you want
+func untarGZ(ctx context.Context, dst, cliName string, r io.Reader) error {
+	log := logr.FromContext(ctx)
 
 	gzr, err := gzip.NewReader(r)
 	if err != nil {
@@ -94,8 +133,6 @@ func Untar(dst string, cliName string, r io.Reader) error {
 	defer gzr.Close()
 
 	tr := tar.NewReader(gzr)
-
-	cliFile := filepath.Join(dst, cliName)
 
 	for {
 		header, err := tr.Next()
@@ -115,40 +152,95 @@ func Untar(dst string, cliName string, r io.Reader) error {
 			continue
 		}
 
-		// the target location where the dir/file should be created
-		target := filepath.Join(dst, header.Name)
+		/* HELM is a pain, the bin file is inside a folder.
+		First split the target and now join it with the base dir where we want to save the file.
+		*/
+		// the target location + header.Name - it's sub folder
+		_, cleanHeader := filepath.Split(header.Name)
+		target := filepath.Join(dst, cleanHeader)
 
 		// check the file type
 		switch header.Typeflag {
 
-		// if its a dir and it doesn't exist create it
-		case tar.TypeDir:
-			if err := makeDirectoryIfNotExists(target); err != nil {
-				return err
-			}
+		// I will never create a folder in this app when unpacking files...
+		// Save for reference
+		/*
+			case tar.TypeDir:
+				if err := makeDirectoryIfNotExists(target); err != nil {
+					return err
+				}
+		*/
 
 		// if it's a file create it
 		case tar.TypeReg:
 			// Only write the cliFile
-			if target == cliFile {
+			if cleanHeader == cliName {
 
+				// TODO change to some debug...
+				log.Info(cleanHeader)
 				/* Since I only untar the cli it self I enforce 0755
 				   else use os.FileMode(header.Mode) to get what the filed had when it was tared.
 				*/
-				f, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(0755))
+				file, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(0755))
 				if err != nil {
 					return err
 				}
 
 				// copy over contents
-				if _, err := io.Copy(f, tr); err != nil {
+				if _, err := io.Copy(file, tr); err != nil {
 					return err
 				}
 
 				// manually close here after each file operation; defering would cause each file close
 				// to wait until all operations have completed.
-				f.Close()
+				file.Close()
 			}
 		}
 	}
+}
+
+// unZIP unzip files and put the result in any folder you want
+func unZIP(ctx context.Context, dst, cliName string, r []byte) error {
+	log := logr.FromContext(ctx)
+
+	zipReader, err := zip.NewReader(bytes.NewReader(r), int64(len(r)))
+	if err != nil {
+		return err
+	}
+
+	log.Info("we are in zip")
+
+	for _, f := range zipReader.File {
+		// the target location + header.Name - it's sub folder
+		_, cleanHeader := filepath.Split(f.Name)
+		target := filepath.Join(dst, cleanHeader)
+
+		if cleanHeader == cliName {
+			// Check for ZipSlip. More Info: http://bit.ly/2MsjAWE
+			if !strings.HasPrefix(target, filepath.Clean(dst)+string(os.PathSeparator)) {
+				return fmt.Errorf("%s: illegal file path", target)
+			}
+
+			outFile, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+			if err != nil {
+				return err
+			}
+
+			rc, err := f.Open()
+			if err != nil {
+				return err
+			}
+
+			_, err = io.Copy(outFile, rc)
+
+			// Close the file without defer to close before next iteration of loop
+			outFile.Close()
+			rc.Close()
+
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

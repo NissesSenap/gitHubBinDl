@@ -11,26 +11,33 @@ I trust the community to not perform breaking changes overall and they only prov
 Is this a over engineering of a simple script? Most definitely but I think it's fun
 and I want a config file to manage what I download in a easy way.
 
+Hopefully this can be helpful for other developers and system admins that want a easy way of getting
+the latest binary download so they can package them for there users.
+
 ## TODO
 
-- Write simple instruction on how to get a GitHub token
+### priority number 1
+
+- Fix match regexp feature
 - If a current release exist of your cli support to save the old version
-- Enable the config file to define how to get the current version of a binary
-  - This way we can check to see what current release we have
-  - Should be able to get the new release from the github API
-  - So we can test before even downloading the cli
-- Just write a log instead of download informing if a new version is available
 - Be able to look which version of a package you want
-- Support .zip instead of only tar.gz
+- Add cli option for configfile + version output
+- Write simple instruction on how to get a GitHub token
 - What build do you want to download? Windows, Darwin, Linux?
+  - I think this works, but I need to verify on a windows computer CI to the rescue
+- Auto build go binary for linux, darwin and windows
+- Write some docs
+  - Example config
+
+### priority number 2
+
 - Be able to auto generate new bash/zsh auto-complete
   - We will need to provide a command on how to do this in your config file
   - Also need to define where to store the auto-complete file
+- Be able to auto ignore rc/alpha releases
+- validate path and url input in data.yaml
+- Just create a json report instead of download informing if a new version is available
 - Support github enterprise by being able to define what github endpoint to use
 - Support two-factor authentication
-- Write some docs
-  - Example config
-- Auto build go binary and container image
 - Not for this project but it would be fun to have a auto-builder for pacman & flatpack of new binary files
-- Be able to auto ignore rc/alpha releases
-- Verify checksum, the issue here is that github don't store checksum in the github API and there is no standard to store them.
+- Verify checksum, the issue here is that github don't store checksum in the github API and there is no standard to store them. This won't most likely happen.

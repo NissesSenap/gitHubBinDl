@@ -2,13 +2,13 @@ package config
 
 // Bin a representation on what to download
 type Bin struct {
-	Cli          string // Name of the cli
-	Owner        string
-	Repo         string
-	Match        string // What we should look for, for example Linux_x86_64
-	BaseURL      string // default github.com, but can be pointed to a local github enterprise instance
-	Download     bool   // If we should download the bin, else it will just write a log default is set to true
-	nonGithubURL string // If used all other values except Cli will be ignored and we will just download the file and unpack it
+	Cli          string `yaml:"cli"`
+	Owner        string `yaml:"owner"`
+	Repo         string `yaml:"repo"`
+	Match        string `yaml:"match"`
+	BaseURL      string `yaml:"baseURL"`
+	Download     bool   `yaml:"download"`
+	NonGithubURL string `yaml:"nonGithubURL"`
 }
 
 // Items config file struct

@@ -49,7 +49,7 @@ func main() {
 
 	}
 
-	// TODO log.Info("config" item) don't work need some basic help here
+	// TODO log.Debug("config" item) don't work need some basic help here
 	//fmt.Printf("config: %v", item)
 
 	apiKEY := getEnv(ctx, "GITHUBAPIKEY", "")
@@ -68,7 +68,7 @@ func main() {
 		Timeout:   time.Second * time.Duration(5),
 	}
 
-	err = app.App(ctx, httpClient, item)
+	err = app.App(ctx, httpClient, &item)
 	if err != nil {
 		log.Error(err, "Unable to download bins")
 		os.Exit(1)

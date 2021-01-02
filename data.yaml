@@ -9,5 +9,9 @@ bins:
     owner: tektoncd
     repo: cli
     match: Linux_x86_64
-    # baseURL: github.com
-    # download: true
+    baseURL: github.com
+    download: true
+  - cli: helm
+    nonGithubURL: https://get.helm.sh/helm-v3.4.2-linux-amd64.tar.gz
+  - cli: helm.exe
+    nonGithubURL: https://get.helm.sh/helm-v3.4.2-windows-amd64.zip
