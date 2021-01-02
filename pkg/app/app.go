@@ -10,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/NissesSenap/gitHubBinDl/pkg/config"
+
 	"github.com/go-logr/logr"
 	"golang.org/x/oauth2"
 
@@ -17,44 +19,56 @@ import (
 )
 
 // App start the app
-func App(ctx context.Context, httpClient *http.Client, githubToken string) error {
-	// so it begins
+func App(ctx context.Context, httpClient *http.Client, configItem config.Items) error {
+	client := github.NewClient(nil)
+
+	// If no githuBAPIToken is specified the application runs without it
+	if configItem.GitHubAPIkey != "" {
+		tokenService := oauth2.StaticTokenSource(
+			&oauth2.Token{AccessToken: configItem.GitHubAPIkey},
+		)
+		tokenClient := oauth2.NewClient(ctx, tokenService)
+
+		client = github.NewClient(tokenClient)
+	}
+
+	// Create the download folder if needed
+	if err := makeDirectoryIfNotExists(configItem.SaveLocation); err != nil {
+		return err
+	}
+
+	pattern := "tkn_0.15.0_Linux_x86_64.tar.gz"
+
+	// TODO currently hardcoded, change to for loop
+	err := downloadBin(ctx, client, httpClient, configItem.Bins[0].Owner, configItem.Bins[0].Repo, configItem.Bins[0].Cli, configItem.SaveLocation, pattern)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func downloadBin(ctx context.Context, client *github.Client, httpClient *http.Client, owner, repo, cliName, saveLocation, pattern string) error {
 	log := logr.FromContext(ctx)
 
-	owner := "tektoncd"
-	repo := "cli"
-	cliName := "tkn"
-	tmpPath := "/tmp/tkn-201230"
-
-	tokenService := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: githubToken},
-	)
-	tokenClient := oauth2.NewClient(ctx, tokenService)
-
-	client := github.NewClient(tokenClient)
-	// response gives information about my rate limit etc, nice to have but no need to do stuff. I assume I will get an error if i go over my rate limit
+	// response gives information about rate limit etc. I assume I will get an error if i go over my rate limit
+	// TODO here a log.debug would be nice...
 	resp, _, err := client.Repositories.GetLatestRelease(ctx, owner, repo)
 	if err != nil {
 		return err
 	}
-	pattern := "tkn_0.15.0_Linux_x86_64.tar.gz"
 	for _, asset := range resp.Assets {
 		log.Info(*asset.Name)
+		// TODO turn pattern in to a simple regexp
 		if *asset.Name == pattern {
 			fmt.Println("hit")
-
-			// Create the tmp folder
-			if err := makeDirectoryIfNotExists(tmpPath); err != nil {
-				// log.Info("unable to stat folder")
-				return err
-			}
 
 			rc, _, err := client.Repositories.DownloadReleaseAsset(ctx, owner, repo, *asset.ID, httpClient)
 			if err != nil {
 				return err
 			}
 
-			err = Untar(tmpPath, cliName, rc)
+			// TODO add a if looking for tar.gz or .zip
+			err = Untar(saveLocation, cliName, rc)
 			if err != nil {
 				return err
 			}
