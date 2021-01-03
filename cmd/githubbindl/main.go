@@ -65,7 +65,7 @@ func main() {
 
 	httpClient := &http.Client{
 		Transport: tr,
-		Timeout:   time.Second * time.Duration(5),
+		Timeout:   time.Second * time.Duration(item.HTTPtimeout),
 	}
 
 	err = app.App(ctx, httpClient, &item)

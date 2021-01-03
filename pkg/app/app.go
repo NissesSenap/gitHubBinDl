@@ -29,6 +29,7 @@ const gzExtension = ".gz"
 
 // App start the app
 func App(ctx context.Context, httpClient *http.Client, configItem *config.Items) error {
+	// TODO find a way to use configItem.Bins[0].BaseURL to download files from custom github endpoints
 	client := github.NewClient(nil)
 
 	// If no githuBAPIToken is specified the application runs without it
@@ -47,6 +48,7 @@ func App(ctx context.Context, httpClient *http.Client, configItem *config.Items)
 	}
 
 	for i := range configItem.Bins {
+		// TODO check configItem.Bins[i].Download == false and create a report function that only is called.
 		err := downloadBin(ctx, client, httpClient, configItem.Bins[i].Owner, configItem.Bins[i].Repo, configItem.Bins[i].Cli, configItem.SaveLocation, configItem.Bins[i].Match, configItem.Bins[i].NonGithubURL)
 		if err != nil {
 			return err
