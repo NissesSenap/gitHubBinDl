@@ -36,7 +36,9 @@ the latest binary download so they can package them for there users.
 - Be able to auto ignore rc/alpha releases
 - validate path and url input in data.yaml
 - Just create a json report instead of download informing if a new version is available
+  - use the download option in data.yaml
 - Support github enterprise by being able to define what github endpoint to use
+  - use the baseURL option in data.yaml
 - Support two-factor authentication
 - Not for this project but it would be fun to have a auto-builder for pacman & flatpack of new binary files
 - Verify checksum, the issue here is that github don't store checksum in the github API and there is no standard to store them. This won't most likely happen.

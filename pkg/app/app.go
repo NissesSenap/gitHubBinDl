@@ -67,7 +67,7 @@ func downloadBin(ctx context.Context, client *github.Client, httpClient *http.Cl
 		defer resp.Body.Close()
 
 		if filepath.Ext(nonGithubURL) == gzExtension {
-			untarGZ(ctx, saveLocation, cliName, resp.Body)
+			err = untarGZ(ctx, saveLocation, cliName, resp.Body)
 			if err != nil {
 				return err
 			}
@@ -98,8 +98,8 @@ func downloadBin(ctx context.Context, client *github.Client, httpClient *http.Cl
 
 	for _, asset := range resp.Assets {
 		log.Info(*asset.Name)
-		// TODO turn pattern in to a simple regexp
-		patternMatched, err := regexp.MatchString(strings.ToLower(pattern), strings.ToLower(*asset.Name))
+		lowerAssetName := strings.ToLower(*asset.Name)
+		patternMatched, err := regexp.MatchString(strings.ToLower(pattern), lowerAssetName)
 		if err != nil {
 			return err
 		}
@@ -109,11 +109,24 @@ func downloadBin(ctx context.Context, client *github.Client, httpClient *http.Cl
 				return err
 			}
 
-			// TODO add a if looking for tar.gz or .zip
-			err = untarGZ(ctx, saveLocation, cliName, rc)
-			if err != nil {
-				return err
+			if filepath.Ext(lowerAssetName) == gzExtension {
+				err = untarGZ(ctx, saveLocation, cliName, rc)
+				if err != nil {
+					return err
+				}
 			}
+
+			if filepath.Ext(lowerAssetName) == zipExtension {
+				zipRespBody, err := ioutil.ReadAll(rc)
+				if err != nil {
+					return err
+				}
+				err = unZIP(ctx, saveLocation, cliName, zipRespBody)
+				if err != nil {
+					return err
+				}
+			}
+
 			// return directly when we get a match, no need to keep on running the loop
 			return nil
 		}
