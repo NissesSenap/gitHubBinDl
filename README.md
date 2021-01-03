@@ -18,7 +18,6 @@ the latest binary download so they can package them for there users.
 
 ### priority number 1
 
-- Fix match regexp feature
 - If a current release exist of your cli support to save the old version
 - Be able to look which version of a package you want
 - Add cli option for configfile + version output

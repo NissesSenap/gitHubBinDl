@@ -6,12 +6,14 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/NissesSenap/gitHubBinDl/pkg/config"
@@ -44,11 +46,8 @@ func App(ctx context.Context, httpClient *http.Client, configItem *config.Items)
 		return err
 	}
 
-	// TODO create regexp
-	pattern := "tkn_0.15.0_Linux_x86_64.tar.gz"
-
 	for i := range configItem.Bins {
-		err := downloadBin(ctx, client, httpClient, configItem.Bins[i].Owner, configItem.Bins[i].Repo, configItem.Bins[i].Cli, configItem.SaveLocation, pattern, configItem.Bins[i].NonGithubURL)
+		err := downloadBin(ctx, client, httpClient, configItem.Bins[i].Owner, configItem.Bins[i].Repo, configItem.Bins[i].Cli, configItem.SaveLocation, configItem.Bins[i].Match, configItem.Bins[i].NonGithubURL)
 		if err != nil {
 			return err
 		}
@@ -96,10 +95,15 @@ func downloadBin(ctx context.Context, client *github.Client, httpClient *http.Cl
 	if err != nil {
 		return err
 	}
+
 	for _, asset := range resp.Assets {
 		log.Info(*asset.Name)
 		// TODO turn pattern in to a simple regexp
-		if *asset.Name == pattern {
+		patternMatched, err := regexp.MatchString(strings.ToLower(pattern), strings.ToLower(*asset.Name))
+		if err != nil {
+			return err
+		}
+		if patternMatched {
 			rc, _, err := client.Repositories.DownloadReleaseAsset(ctx, owner, repo, *asset.ID, httpClient)
 			if err != nil {
 				return err
@@ -110,9 +114,13 @@ func downloadBin(ctx context.Context, client *github.Client, httpClient *http.Cl
 			if err != nil {
 				return err
 			}
+			// return directly when we get a match, no need to keep on running the loop
+			return nil
 		}
 	}
-	return nil
+
+	// normally return earlier, should only come here if we fail to find the bin
+	return errors.New("Unable to find match")
 }
 
 func makeDirectoryIfNotExists(path string) error {
