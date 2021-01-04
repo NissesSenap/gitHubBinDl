@@ -63,6 +63,7 @@ func main() {
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: item.HTTPinsecure},
 	}
 
+	// TODO set 5 as the default timeout value, ignore if HTTPtimeout = 0
 	httpClient := &http.Client{
 		Transport: tr,
 		Timeout:   time.Second * time.Duration(item.HTTPtimeout),

@@ -41,7 +41,7 @@ data.yaml supports the following values:
 | Config         | Comment    | Example  | Default |
 | -------------- | :----------| :------- | -------: |
 | githubAPIkey   | Your github API key | myAPIkey | "" |
-| httpTimeout    | The http timeout in seconds | 5 | 3|
+| httpTimeout    | The http timeout in seconds | 5 | 5 |
 | httpInsecure   | Allow https without verified certificate | true | false |
 | saveLocation   | Where your binary files will be saved | /usr/local/bin | /tmp/todays-date |
 | bins           | A list of binaries to download | see bellow | ""|
@@ -98,6 +98,9 @@ For more detailed instructions you can look through this [medium article](https:
 
 ### priority number 1
 
+- Support to download bin that isn't packed in a archive like tar or gz.
+  - https://github.com/bitnami-labs/sealed-secrets/releases/tag/v0.13.1
+  - https://github.com/fluxcd/flux/releases/tag/1.21.0
 - If a current release exist of your cli support to save the old version
 - Be able to look which version of a package you want
 - Add cli option for configfile + version output

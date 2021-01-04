@@ -1,6 +1,6 @@
 ---
 # githubAPIkey: myAPIkey
-httpTimeout: 3
+httpTimeout: 5
 httpInsecure: false
 saveLocation: /tmp/tkn-210102
 
