@@ -64,39 +64,16 @@ func downloadBin(ctx context.Context, client *github.Client, httpClient *http.Cl
 	log.Info(nonGithubURL)
 	if nonGithubURL != "" {
 		resp, err := httpClient.Get(nonGithubURL)
+
 		if err != nil {
 			return err
 		}
 		defer resp.Body.Close()
 
-		if filepath.Ext(nonGithubURL) == gzExtension {
-			err = untarGZ(ctx, saveLocation, cliName, resp.Body)
-			if err != nil {
-				return err
-			}
-			return nil
+		err = pickExtension(ctx, resp.Body, cliName, saveLocation, nonGithubURL)
+		if err != nil {
+			return err
 		}
-
-		if filepath.Ext(nonGithubURL) == zipExtension {
-			zipRespBody, err := ioutil.ReadAll(resp.Body)
-			if err != nil {
-				return err
-			}
-			err = unZIP(ctx, saveLocation, cliName, zipRespBody)
-			if err != nil {
-				return err
-			}
-			return nil
-		}
-
-		if filepath.Ext(nonGithubURL) == "" {
-			saveFile(ctx, saveLocation, cliName, resp.Body)
-			if err != nil {
-				return err
-			}
-			return nil
-		}
-
 		return nil
 	}
 
@@ -119,30 +96,11 @@ func downloadBin(ctx context.Context, client *github.Client, httpClient *http.Cl
 			if err != nil {
 				return err
 			}
-
-			switch filepath.Ext(lowerAssetName) {
-			case gzExtension:
-				err = untarGZ(ctx, saveLocation, cliName, rc)
-				if err != nil {
-					return err
-				}
-			case zipExtension:
-				zipRespBody, err := ioutil.ReadAll(rc)
-				if err != nil {
-					return err
-				}
-				err = unZIP(ctx, saveLocation, cliName, zipRespBody)
-				if err != nil {
-					return err
-				}
-			case "", exeExtension:
-				err = saveFile(ctx, saveLocation, cliName, rc)
-				if err != nil {
-					return err
-				}
-			default:
-				return errors.New("The file extenssion is not supported")
+			err = pickExtension(ctx, rc, cliName, saveLocation, lowerAssetName)
+			if err != nil {
+				return err
 			}
+
 			// return directly when we get a match, no need to keep on running the loop
 			return nil
 		}
@@ -150,6 +108,37 @@ func downloadBin(ctx context.Context, client *github.Client, httpClient *http.Cl
 
 	// normally return earlier, should only come here if we fail to find the bin
 	return errors.New("Unable to find match")
+}
+
+func pickExtension(ctx context.Context, respBody io.ReadCloser, cliName, saveLocation, downloadURL string) error {
+
+	switch filepath.Ext(downloadURL) {
+	case gzExtension:
+		err := untarGZ(ctx, saveLocation, cliName, respBody)
+		if err != nil {
+			return err
+		}
+		return nil
+	case zipExtension:
+		zipRespBody, err := ioutil.ReadAll(respBody)
+		if err != nil {
+			return err
+		}
+		err = unZIP(ctx, saveLocation, cliName, zipRespBody)
+		if err != nil {
+			return err
+		}
+		return nil
+	case "", exeExtension:
+		err := saveFile(ctx, saveLocation, cliName, respBody)
+		if err != nil {
+			return err
+		}
+	default:
+		return errors.New("The file extenssion is not supported")
+	}
+
+	return nil
 }
 
 //saveFile used if the file have no extension

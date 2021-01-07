@@ -22,10 +22,10 @@ bins:
     owner: fluxcd
     repo: flux
     match: linux_amd64
-  - cli: kubeseal.exe
-    owner: bitnami-labs
-    repo: sealed-secrets
-    match: kubeseal.exe
+  #- cli: kubeseal.exe
+  #  owner: bitnami-labs
+  #  repo: sealed-secrets
+  #  match: kubeseal.exe
   - cli: helm
     nonGithubURL: https://get.helm.sh/helm-v3.4.2-linux-amd64.tar.gz
   - cli: helm.exe
