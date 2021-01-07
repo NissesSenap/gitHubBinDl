@@ -81,6 +81,11 @@ bins:
     match: Windows_x86_64
     baseURL: https://my.github.enterprise.com
     download: false
+  - cli: kubeseal.exe
+    owner: bitnami-labs
+    repo: sealed-secrets
+    tag: v0.13.1
+    match: kubeseal.exe
   - cli: helm
     nonGithubURL: https://get.helm.sh/helm-v3.4.2-linux-amd64.tar.gz
   - cli: helm.exe
