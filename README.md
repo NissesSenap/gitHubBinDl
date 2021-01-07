@@ -53,6 +53,7 @@ What values you can have under bin:
 | - cli        | The name of the cli, it have to be exact since it used to match when unpacking the archive | tkn | "" |
 | owner        | The github owner |tektoncd | ""|
 | repo         | The github repo | cli | ""|
+| tag          | A specific tagged release, only support specific version downloads that is tagged. If not defined latest will be used | v0.13.0 | ""|
 | match        | How to know which archive to download, GitHubBinDl uses a simple regex match feature | Linux_x86_64 | "" |
 | baseURL      | Github endpoint | https://my.github.enterprise.com | github.com |
 | download     | Downloaded package, if not it will just be reported | true | true |
@@ -99,7 +100,6 @@ For more detailed instructions you can look through this [medium article](https:
 ### priority number 1
 
 - If a current release exist of your cli support to save the old version
-- Be able to look which version of a package you want
 - Add cli option for configfile + version output
 - Write simple instruction on how to get a GitHub token
 - What build do you want to download? Windows, Darwin, Linux?

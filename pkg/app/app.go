@@ -50,7 +50,7 @@ func App(ctx context.Context, httpClient *http.Client, configItem *config.Items)
 
 	for i := range configItem.Bins {
 		// TODO check configItem.Bins[i].Download == false and create a report function that only is called.
-		err := downloadBin(ctx, client, httpClient, configItem.Bins[i].Owner, configItem.Bins[i].Repo, configItem.Bins[i].Cli, configItem.SaveLocation, configItem.Bins[i].Match, configItem.Bins[i].NonGithubURL)
+		err := downloadBin(ctx, client, httpClient, configItem.Bins[i].Owner, configItem.Bins[i].Repo, configItem.Bins[i].Cli, configItem.Bins[i].Tag, configItem.SaveLocation, configItem.Bins[i].Match, configItem.Bins[i].NonGithubURL)
 		if err != nil {
 			return err
 		}
@@ -58,7 +58,7 @@ func App(ctx context.Context, httpClient *http.Client, configItem *config.Items)
 	return nil
 }
 
-func downloadBin(ctx context.Context, client *github.Client, httpClient *http.Client, owner, repo, cliName, saveLocation, pattern, nonGithubURL string) error {
+func downloadBin(ctx context.Context, client *github.Client, httpClient *http.Client, owner, repo, cliName, tag, saveLocation, pattern, nonGithubURL string) error {
 	log := logr.FromContext(ctx)
 
 	log.Info(nonGithubURL)
@@ -77,11 +77,23 @@ func downloadBin(ctx context.Context, client *github.Client, httpClient *http.Cl
 		return nil
 	}
 
-	// response gives information about rate limit etc. I assume I will get an error if i go over my rate limit
-	// TODO here a log.debug would be nice...
-	resp, _, err := client.Repositories.GetLatestRelease(ctx, owner, repo)
-	if err != nil {
-		return err
+	var resp *github.RepositoryRelease
+	var er error
+
+	// If tag is empty use GetReleaseByTag
+	if tag != "" {
+		// response gives information about rate limit etc. I assume I will get an error if i go over my rate limit
+		// TODO here a log.debug would be nice...
+		resp, _, er = client.Repositories.GetReleaseByTag(ctx, owner, repo, tag)
+		if er != nil {
+			return er
+		}
+
+	} else {
+		resp, _, er = client.Repositories.GetLatestRelease(ctx, owner, repo)
+		if er != nil {
+			return er
+		}
 	}
 
 	for _, asset := range resp.Assets {
@@ -145,7 +157,10 @@ func pickExtension(ctx context.Context, respBody io.ReadCloser, cliName, saveLoc
 func saveFile(ctx context.Context, dst, cliName string, rc io.Reader) error {
 	log := logr.FromContext(ctx)
 	buf := new(bytes.Buffer)
-	buf.ReadFrom(rc)
+	_, err := buf.ReadFrom(rc)
+	if err != nil {
+		return err
+	}
 
 	target := filepath.Join(dst, cliName)
 	f, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.FileMode(0755))
@@ -154,7 +169,10 @@ func saveFile(ctx context.Context, dst, cliName string, rc io.Reader) error {
 	}
 
 	log.Info("Downloading", "target", target)
-	buf.WriteTo(f)
+	_, err = buf.WriteTo(f)
+	if err != nil {
+		return err
+	}
 	//CLOSE THE FILE
 	if err := f.Close(); err != nil {
 		return err

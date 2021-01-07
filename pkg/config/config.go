@@ -5,6 +5,7 @@ type Bin struct {
 	Cli          string `yaml:"cli"`
 	Owner        string `yaml:"owner"`
 	Repo         string `yaml:"repo"`
+	Tag          string `yaml:"tag"`
 	Match        string `yaml:"match"`
 	BaseURL      string `yaml:"baseURL"`
 	Download     bool   `yaml:"download"`
