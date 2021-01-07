@@ -26,6 +26,7 @@ import (
 
 const zipExtension = ".zip"
 const gzExtension = ".gz"
+const exeExtension = ".exe"
 
 // App start the app
 func App(ctx context.Context, httpClient *http.Client, configItem *config.Items) error {
@@ -88,6 +89,14 @@ func downloadBin(ctx context.Context, client *github.Client, httpClient *http.Cl
 			return nil
 		}
 
+		if filepath.Ext(nonGithubURL) == "" {
+			saveFile(ctx, saveLocation, cliName, resp.Body)
+			if err != nil {
+				return err
+			}
+			return nil
+		}
+
 		return nil
 	}
 
@@ -111,14 +120,13 @@ func downloadBin(ctx context.Context, client *github.Client, httpClient *http.Cl
 				return err
 			}
 
-			if filepath.Ext(lowerAssetName) == gzExtension {
+			switch filepath.Ext(lowerAssetName) {
+			case gzExtension:
 				err = untarGZ(ctx, saveLocation, cliName, rc)
 				if err != nil {
 					return err
 				}
-			}
-
-			if filepath.Ext(lowerAssetName) == zipExtension {
+			case zipExtension:
 				zipRespBody, err := ioutil.ReadAll(rc)
 				if err != nil {
 					return err
@@ -127,8 +135,14 @@ func downloadBin(ctx context.Context, client *github.Client, httpClient *http.Cl
 				if err != nil {
 					return err
 				}
+			case "", exeExtension:
+				err = saveFile(ctx, saveLocation, cliName, rc)
+				if err != nil {
+					return err
+				}
+			default:
+				return errors.New("The file extenssion is not supported")
 			}
-
 			// return directly when we get a match, no need to keep on running the loop
 			return nil
 		}
@@ -136,6 +150,27 @@ func downloadBin(ctx context.Context, client *github.Client, httpClient *http.Cl
 
 	// normally return earlier, should only come here if we fail to find the bin
 	return errors.New("Unable to find match")
+}
+
+//saveFile used if the file have no extension
+func saveFile(ctx context.Context, dst, cliName string, rc io.Reader) error {
+	log := logr.FromContext(ctx)
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(rc)
+
+	target := filepath.Join(dst, cliName)
+	f, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.FileMode(0755))
+	if err != nil {
+		return err
+	}
+
+	log.Info("Downloading", "target", target)
+	buf.WriteTo(f)
+	//CLOSE THE FILE
+	if err := f.Close(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func makeDirectoryIfNotExists(path string) error {

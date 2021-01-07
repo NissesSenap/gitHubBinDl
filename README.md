@@ -98,9 +98,6 @@ For more detailed instructions you can look through this [medium article](https:
 
 ### priority number 1
 
-- Support to download bin that isn't packed in a archive like tar or gz.
-  - https://github.com/bitnami-labs/sealed-secrets/releases/tag/v0.13.1
-  - https://github.com/fluxcd/flux/releases/tag/1.21.0
 - If a current release exist of your cli support to save the old version
 - Be able to look which version of a package you want
 - Add cli option for configfile + version output
