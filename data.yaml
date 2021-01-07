@@ -18,6 +18,15 @@ bins:
     match: Windows_x86_64
     baseURL: github.com
     download: true
+  - cli: fluxctl
+    owner: fluxcd
+    repo: flux
+    match: linux_amd64
+  - cli: kubeseal.exe
+    owner: bitnami-labs
+    repo: sealed-secrets
+    tag: v0.13.1
+    match: kubeseal.exe
   - cli: helm
     nonGithubURL: https://get.helm.sh/helm-v3.4.2-linux-amd64.tar.gz
   - cli: helm.exe

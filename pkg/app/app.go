@@ -26,6 +26,7 @@ import (
 
 const zipExtension = ".zip"
 const gzExtension = ".gz"
+const exeExtension = ".exe"
 
 // App start the app
 func App(ctx context.Context, httpClient *http.Client, configItem *config.Items) error {
@@ -49,7 +50,7 @@ func App(ctx context.Context, httpClient *http.Client, configItem *config.Items)
 
 	for i := range configItem.Bins {
 		// TODO check configItem.Bins[i].Download == false and create a report function that only is called.
-		err := downloadBin(ctx, client, httpClient, configItem.Bins[i].Owner, configItem.Bins[i].Repo, configItem.Bins[i].Cli, configItem.SaveLocation, configItem.Bins[i].Match, configItem.Bins[i].NonGithubURL)
+		err := downloadBin(ctx, client, httpClient, configItem.Bins[i].Owner, configItem.Bins[i].Repo, configItem.Bins[i].Cli, configItem.Bins[i].Tag, configItem.SaveLocation, configItem.Bins[i].Match, configItem.Bins[i].NonGithubURL)
 		if err != nil {
 			return err
 		}
@@ -57,45 +58,42 @@ func App(ctx context.Context, httpClient *http.Client, configItem *config.Items)
 	return nil
 }
 
-func downloadBin(ctx context.Context, client *github.Client, httpClient *http.Client, owner, repo, cliName, saveLocation, pattern, nonGithubURL string) error {
+func downloadBin(ctx context.Context, client *github.Client, httpClient *http.Client, owner, repo, cliName, tag, saveLocation, pattern, nonGithubURL string) error {
 	log := logr.FromContext(ctx)
 
 	log.Info(nonGithubURL)
 	if nonGithubURL != "" {
 		resp, err := httpClient.Get(nonGithubURL)
+
 		if err != nil {
 			return err
 		}
 		defer resp.Body.Close()
 
-		if filepath.Ext(nonGithubURL) == gzExtension {
-			err = untarGZ(ctx, saveLocation, cliName, resp.Body)
-			if err != nil {
-				return err
-			}
-			return nil
+		err = pickExtension(ctx, resp.Body, cliName, saveLocation, nonGithubURL)
+		if err != nil {
+			return err
 		}
-
-		if filepath.Ext(nonGithubURL) == zipExtension {
-			zipRespBody, err := ioutil.ReadAll(resp.Body)
-			if err != nil {
-				return err
-			}
-			err = unZIP(ctx, saveLocation, cliName, zipRespBody)
-			if err != nil {
-				return err
-			}
-			return nil
-		}
-
 		return nil
 	}
 
-	// response gives information about rate limit etc. I assume I will get an error if i go over my rate limit
-	// TODO here a log.debug would be nice...
-	resp, _, err := client.Repositories.GetLatestRelease(ctx, owner, repo)
-	if err != nil {
-		return err
+	var resp *github.RepositoryRelease
+	var er error
+
+	// If tag is empty use GetReleaseByTag
+	if tag != "" {
+		// response gives information about rate limit etc. I assume I will get an error if i go over my rate limit
+		// TODO here a log.debug would be nice...
+		resp, _, er = client.Repositories.GetReleaseByTag(ctx, owner, repo, tag)
+		if er != nil {
+			return er
+		}
+
+	} else {
+		resp, _, er = client.Repositories.GetLatestRelease(ctx, owner, repo)
+		if er != nil {
+			return er
+		}
 	}
 
 	for _, asset := range resp.Assets {
@@ -110,23 +108,9 @@ func downloadBin(ctx context.Context, client *github.Client, httpClient *http.Cl
 			if err != nil {
 				return err
 			}
-
-			if filepath.Ext(lowerAssetName) == gzExtension {
-				err = untarGZ(ctx, saveLocation, cliName, rc)
-				if err != nil {
-					return err
-				}
-			}
-
-			if filepath.Ext(lowerAssetName) == zipExtension {
-				zipRespBody, err := ioutil.ReadAll(rc)
-				if err != nil {
-					return err
-				}
-				err = unZIP(ctx, saveLocation, cliName, zipRespBody)
-				if err != nil {
-					return err
-				}
+			err = pickExtension(ctx, rc, cliName, saveLocation, lowerAssetName)
+			if err != nil {
+				return err
 			}
 
 			// return directly when we get a match, no need to keep on running the loop
@@ -136,6 +120,64 @@ func downloadBin(ctx context.Context, client *github.Client, httpClient *http.Cl
 
 	// normally return earlier, should only come here if we fail to find the bin
 	return errors.New("Unable to find match")
+}
+
+func pickExtension(ctx context.Context, respBody io.ReadCloser, cliName, saveLocation, downloadURL string) error {
+
+	switch filepath.Ext(downloadURL) {
+	case gzExtension:
+		err := untarGZ(ctx, saveLocation, cliName, respBody)
+		if err != nil {
+			return err
+		}
+		return nil
+	case zipExtension:
+		zipRespBody, err := ioutil.ReadAll(respBody)
+		if err != nil {
+			return err
+		}
+		err = unZIP(ctx, saveLocation, cliName, zipRespBody)
+		if err != nil {
+			return err
+		}
+		return nil
+	case "", exeExtension:
+		err := saveFile(ctx, saveLocation, cliName, respBody)
+		if err != nil {
+			return err
+		}
+	default:
+		return errors.New("The file extenssion is not supported")
+	}
+
+	return nil
+}
+
+//saveFile used if the file have no extension
+func saveFile(ctx context.Context, dst, cliName string, rc io.Reader) error {
+	log := logr.FromContext(ctx)
+	buf := new(bytes.Buffer)
+	_, err := buf.ReadFrom(rc)
+	if err != nil {
+		return err
+	}
+
+	target := filepath.Join(dst, cliName)
+	f, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.FileMode(0755))
+	if err != nil {
+		return err
+	}
+
+	log.Info("Downloading", "target", target)
+	_, err = buf.WriteTo(f)
+	if err != nil {
+		return err
+	}
+	//CLOSE THE FILE
+	if err := f.Close(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func makeDirectoryIfNotExists(path string) error {
