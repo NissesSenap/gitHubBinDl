@@ -29,8 +29,8 @@ If you login you will instead get 5000 requests an hour. Bellow you can find ins
 ### Manage config
 
 By default GitHubBinDl uses a data.yaml located in the same folder as your GitHubBinDl binary.
-Currently you can set the environment variable CONFIGFILE and point to another file location.
-In the future the plan is to go over to using a CLI option. TODO
+You can override this value by using the environment variable CONFIGFILE and point to another file location.
+Or use the `-f` flag when running gitHubBinDl.
 
 If you use a GitHub API token you can store it in two ways,
 ether it in the config file or as a environment variable: GITHUBAPIKEY.
@@ -92,6 +92,15 @@ bins:
     nonGithubURL: https://get.helm.sh/helm-v3.4.2-windows-amd64.zip
 ```
 
+### Config precedence
+
+The precedence for flag value sources is as follows (highest to lowest):
+
+0. Command line flag value from user
+1. Environment variable (if specified)
+2. Configuration file value
+3. Default defined on the flag
+
 ### Create a GitHub token
 
 It's rather straight forward to generate a Github token, currently I use the UI.
@@ -104,12 +113,11 @@ For more detailed instructions you can look through this [medium article](https:
 
 ### priority number 1
 
+- Speed up bin download by using goroutine
 - If a current release exist of your cli support to save the old version
-- Add cli option for configfile + version output
-- Write simple instruction on how to get a GitHub token
 - What build do you want to download? Windows, Darwin, Linux?
   - I think this works, but I need to verify on a windows computer CI to the rescue
-- Auto build go binary for linux, darwin and windows
+- Update Makefile to auto-update version nr
 
 ### priority number 2
 

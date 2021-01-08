@@ -31,7 +31,8 @@ func TestMain(t *testing.T) {
 		downloadItems = append(downloadItems, filepath.Join(item.SaveLocation, item.Bins[i].Cli))
 	}
 
-	files, _ := filepath.Glob(item.SaveLocation + "*")
+	// The /* is due to that the location might be missing a final /, even if it do it won't create any issues
+	files, _ := filepath.Glob(filepath.Join(item.SaveLocation + "/*"))
 
 	assert.ElementsMatch(t, downloadItems, files)
 }

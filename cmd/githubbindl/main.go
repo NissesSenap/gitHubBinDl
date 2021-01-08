@@ -3,12 +3,14 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"time"
 
+	"github.com/NissesSenap/gitHubBinDl/build"
 	"github.com/NissesSenap/gitHubBinDl/pkg/app"
 	"github.com/NissesSenap/gitHubBinDl/pkg/config"
 	"github.com/go-logr/logr"
@@ -29,9 +31,16 @@ func main() {
 	log = zapr.NewLogger(zapLog)
 	ctx := logr.NewContext(context.Background(), log)
 
-	// TODO handle this with CLI input instead
-	filename := getEnv(ctx, "CONFIGFILE", "data.yaml")
+	var filename string
+	configFile := readCli()
 
+	if *configFile == "" {
+		filename = getEnv(ctx, "CONFIGFILE", "data.yaml")
+	} else {
+		filename = *configFile
+	}
+
+	log.Info("", "Configfilename:", filename)
 	var item config.Items
 
 	// Read the config file
@@ -74,6 +83,25 @@ func main() {
 		log.Error(err, "Unable to download bins")
 		os.Exit(1)
 	}
+}
+
+func readCli() *string {
+	help := flag.Bool("help", false, "prints the help output.")
+	configfile := flag.String("f", "", "Configfile to read data from, default data.yaml")
+	version := flag.Bool("version", false, "print application version.")
+	flag.Parse()
+
+	if *help {
+		flag.PrintDefaults()
+		os.Exit(0)
+	}
+
+	if *version {
+		fmt.Printf("githubBinDl Version: %s, BuildDate: %s", build.Version, build.BuildDate)
+		os.Exit(0)
+	}
+
+	return configfile
 }
 
 // getEnv get key environment variable if exist otherwise return defalutValue
