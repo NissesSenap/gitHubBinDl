@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/NissesSenap/gitHubBinDl/pkg/config"
 
@@ -48,17 +49,34 @@ func App(ctx context.Context, httpClient *http.Client, configItem *config.Items)
 		return err
 	}
 
+	var wg sync.WaitGroup
+	channel := make(chan error)
+
 	for i := range configItem.Bins {
 		// TODO check configItem.Bins[i].Download == false and create a report function that only is called.
-		err := downloadBin(ctx, client, httpClient, configItem.Bins[i].Owner, configItem.Bins[i].Repo, configItem.Bins[i].Cli, configItem.Bins[i].Tag, configItem.SaveLocation, configItem.Bins[i].Match, configItem.Bins[i].NonGithubURL)
+		wg.Add(1)
+		go downloadBin(ctx, &wg, channel, client, httpClient, configItem.Bins[i].Owner, configItem.Bins[i].Repo, configItem.Bins[i].Cli, configItem.Bins[i].Tag, configItem.SaveLocation, configItem.Bins[i].Match, configItem.Bins[i].NonGithubURL)
+		fmt.Println("so much stuff")
+
+	}
+
+	go func() {
+		wg.Wait()
+		close(channel)
+	}()
+
+	for err := range channel {
 		if err != nil {
 			return err
 		}
 	}
 	return nil
+
 }
 
-func downloadBin(ctx context.Context, client *github.Client, httpClient *http.Client, owner, repo, cliName, tag, saveLocation, pattern, nonGithubURL string) error {
+func downloadBin(ctx context.Context, wg *sync.WaitGroup, channel chan error, client *github.Client, httpClient *http.Client, owner, repo, cliName, tag, saveLocation, pattern, nonGithubURL string) {
+	defer wg.Done()
+
 	log := logr.FromContext(ctx)
 
 	log.Info(nonGithubURL)
@@ -66,15 +84,15 @@ func downloadBin(ctx context.Context, client *github.Client, httpClient *http.Cl
 		resp, err := httpClient.Get(nonGithubURL)
 
 		if err != nil {
-			return err
+			channel <- err
 		}
 		defer resp.Body.Close()
 
 		err = pickExtension(ctx, resp.Body, cliName, saveLocation, nonGithubURL)
 		if err != nil {
-			return err
+			channel <- err
 		}
-		return nil
+		channel <- nil
 	}
 
 	var resp *github.RepositoryRelease
@@ -86,13 +104,13 @@ func downloadBin(ctx context.Context, client *github.Client, httpClient *http.Cl
 		// TODO here a log.debug would be nice...
 		resp, _, er = client.Repositories.GetReleaseByTag(ctx, owner, repo, tag)
 		if er != nil {
-			return er
+			channel <- er
 		}
 
 	} else {
 		resp, _, er = client.Repositories.GetLatestRelease(ctx, owner, repo)
 		if er != nil {
-			return er
+			channel <- er
 		}
 	}
 
@@ -101,25 +119,24 @@ func downloadBin(ctx context.Context, client *github.Client, httpClient *http.Cl
 		lowerAssetName := strings.ToLower(*asset.Name)
 		patternMatched, err := regexp.MatchString(strings.ToLower(pattern), lowerAssetName)
 		if err != nil {
-			return err
+			channel <- err
 		}
 		if patternMatched {
 			rc, _, err := client.Repositories.DownloadReleaseAsset(ctx, owner, repo, *asset.ID, httpClient)
 			if err != nil {
-				return err
+				channel <- err
 			}
 			err = pickExtension(ctx, rc, cliName, saveLocation, lowerAssetName)
 			if err != nil {
-				return err
+				channel <- err
 			}
 
-			// return directly when we get a match, no need to keep on running the loop
-			return nil
+			channel <- nil
 		}
 	}
 
 	// normally return earlier, should only come here if we fail to find the bin
-	return errors.New("Unable to find match")
+	channel <- errors.New("Unable to find match")
 }
 
 func pickExtension(ctx context.Context, respBody io.ReadCloser, cliName, saveLocation, downloadURL string) error {
