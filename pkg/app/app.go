@@ -51,28 +51,28 @@ func App(ctx context.Context, httpClient *http.Client, configItem *config.Items)
 
 	var wg sync.WaitGroup
 	channel := make(chan error, len(configItem.Bins))
-
-	go func() {
-		wg.Wait()
-		close(channel)
-	}()
-
-	wg.Add(len(configItem.Bins))
+	fmt.Printf("cap: %v, len: %v \n", cap(channel), len(channel))
 
 	for i := range configItem.Bins {
 		// TODO check configItem.Bins[i].Download == false and create a report function that only is called.
-		//wg.Add(1)
+		wg.Add(1)
 		go downloadBin(ctx, &wg, channel, client, httpClient, configItem.Bins[i].Owner, configItem.Bins[i].Repo, configItem.Bins[i].Cli, configItem.Bins[i].Tag, configItem.SaveLocation, configItem.Bins[i].Match, configItem.Bins[i].NonGithubURL)
 		fmt.Println("so much stuff")
-
 	}
 
+	wg.Wait()
+
+	// The for creates the issue...
 	for err := range channel {
 		if err != nil {
+			fmt.Printf("in the error cap: %v, len: %v \n", cap(channel), len(channel))
 			close(channel)
 			return err
 		}
 	}
+
+	fmt.Println("I never come here")
+	close(channel)
 	return nil
 
 }
@@ -88,12 +88,14 @@ func downloadBin(ctx context.Context, wg *sync.WaitGroup, channel chan error, cl
 
 		if err != nil {
 			channel <- err
+			return
 		}
 		defer resp.Body.Close()
 
 		err = pickExtension(ctx, resp.Body, cliName, saveLocation, nonGithubURL)
 		if err != nil {
 			channel <- err
+			return
 		}
 		return
 	}
@@ -108,12 +110,14 @@ func downloadBin(ctx context.Context, wg *sync.WaitGroup, channel chan error, cl
 		resp, _, er = client.Repositories.GetReleaseByTag(ctx, owner, repo, tag)
 		if er != nil {
 			channel <- er
+			return
 		}
 
 	} else {
 		resp, _, er = client.Repositories.GetLatestRelease(ctx, owner, repo)
 		if er != nil {
 			channel <- er
+			return
 		}
 	}
 
@@ -123,15 +127,18 @@ func downloadBin(ctx context.Context, wg *sync.WaitGroup, channel chan error, cl
 		patternMatched, err := regexp.MatchString(strings.ToLower(pattern), lowerAssetName)
 		if err != nil {
 			channel <- err
+			return
 		}
 		if patternMatched {
 			rc, _, err := client.Repositories.DownloadReleaseAsset(ctx, owner, repo, *asset.ID, httpClient)
 			if err != nil {
 				channel <- err
+				return
 			}
 			err = pickExtension(ctx, rc, cliName, saveLocation, lowerAssetName)
 			if err != nil {
 				channel <- err
+				return
 			}
 
 			return
