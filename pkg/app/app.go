@@ -50,23 +50,26 @@ func App(ctx context.Context, httpClient *http.Client, configItem *config.Items)
 	}
 
 	var wg sync.WaitGroup
-	channel := make(chan error)
-
-	for i := range configItem.Bins {
-		// TODO check configItem.Bins[i].Download == false and create a report function that only is called.
-		wg.Add(1)
-		go downloadBin(ctx, &wg, channel, client, httpClient, configItem.Bins[i].Owner, configItem.Bins[i].Repo, configItem.Bins[i].Cli, configItem.Bins[i].Tag, configItem.SaveLocation, configItem.Bins[i].Match, configItem.Bins[i].NonGithubURL)
-		fmt.Println("so much stuff")
-
-	}
+	channel := make(chan error, len(configItem.Bins))
 
 	go func() {
 		wg.Wait()
 		close(channel)
 	}()
 
+	wg.Add(len(configItem.Bins))
+
+	for i := range configItem.Bins {
+		// TODO check configItem.Bins[i].Download == false and create a report function that only is called.
+		//wg.Add(1)
+		go downloadBin(ctx, &wg, channel, client, httpClient, configItem.Bins[i].Owner, configItem.Bins[i].Repo, configItem.Bins[i].Cli, configItem.Bins[i].Tag, configItem.SaveLocation, configItem.Bins[i].Match, configItem.Bins[i].NonGithubURL)
+		fmt.Println("so much stuff")
+
+	}
+
 	for err := range channel {
 		if err != nil {
+			close(channel)
 			return err
 		}
 	}
@@ -92,7 +95,7 @@ func downloadBin(ctx context.Context, wg *sync.WaitGroup, channel chan error, cl
 		if err != nil {
 			channel <- err
 		}
-		channel <- nil
+		return
 	}
 
 	var resp *github.RepositoryRelease
@@ -131,7 +134,7 @@ func downloadBin(ctx context.Context, wg *sync.WaitGroup, channel chan error, cl
 				channel <- err
 			}
 
-			channel <- nil
+			return
 		}
 	}
 
