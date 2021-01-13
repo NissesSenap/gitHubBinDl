@@ -8,6 +8,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/NissesSenap/gitHubBinDl/build"
@@ -30,6 +32,19 @@ func main() {
 	}
 	log = zapr.NewLogger(zapLog)
 	ctx := logr.NewContext(context.Background(), log)
+	var cancel context.CancelFunc
+	ctx, cancel = context.WithCancel(ctx)
+
+	// Create SIGTERM channel
+	done := make(chan os.Signal, 1)
+	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		// blocking, waiting for a SIGTERM
+		<-done
+		// cancel ctx
+		cancel()
+	}()
 
 	var filename string
 	configFile := readCli()
