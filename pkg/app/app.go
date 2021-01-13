@@ -16,6 +16,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/NissesSenap/gitHubBinDl/pkg/config"
 
@@ -55,7 +56,7 @@ func App(ctx context.Context, httpClient *http.Client, configItem *config.Items)
 	for i := range configItem.Bins {
 		// TODO check configItem.Bins[i].Download == false and create a report function that only is called.
 		wg.Add(1)
-		go downloadBin(ctx, &wg, channel, client, httpClient, configItem.Bins[i].Owner, configItem.Bins[i].Repo, configItem.Bins[i].Cli, configItem.Bins[i].Tag, configItem.SaveLocation, configItem.Bins[i].Match, configItem.Bins[i].NonGithubURL)
+		go downloadBin(ctx, &wg, channel, client, httpClient, configItem.Bins[i].Owner, configItem.Bins[i].Repo, configItem.Bins[i].Cli, configItem.Bins[i].Tag, configItem.SaveLocation, configItem.Bins[i].Match, configItem.Bins[i].NonGithubURL, configItem.HTTPtimeout)
 	}
 
 	// Blocking, waiting for the wg to finish
@@ -76,15 +77,24 @@ func App(ctx context.Context, httpClient *http.Client, configItem *config.Items)
 
 }
 
-func downloadBin(ctx context.Context, wg *sync.WaitGroup, channel chan error, client *github.Client, httpClient *http.Client, owner, repo, cliName, tag, saveLocation, pattern, nonGithubURL string) {
+func downloadBin(ctx context.Context, wg *sync.WaitGroup, channel chan error, client *github.Client, httpClient *http.Client, owner, repo, cliName, tag, saveLocation, pattern, nonGithubURL string, httpTimeout int) {
 	defer wg.Done()
 
 	log := logr.FromContext(ctx)
 
 	log.Info(nonGithubURL)
 	if nonGithubURL != "" {
-		resp, err := httpClient.Get(nonGithubURL)
+		// Instead of using httpClient.Timeout I use a ctx with Deadline.
+		ctx, cancel := context.WithDeadline(ctx, time.Now().Add(time.Duration(httpTimeout)*time.Second))
+		defer cancel()
 
+		req, err := http.NewRequest(http.MethodGet, nonGithubURL, nil)
+		if err != nil {
+			channel <- err
+			return
+		}
+		req = req.WithContext(ctx)
+		resp, err := httpClient.Do(req)
 		if err != nil {
 			channel <- err
 			return
