@@ -51,27 +51,24 @@ func App(ctx context.Context, httpClient *http.Client, configItem *config.Items)
 
 	var wg sync.WaitGroup
 	channel := make(chan error, len(configItem.Bins))
-	fmt.Printf("cap: %v, len: %v \n", cap(channel), len(channel))
 
 	for i := range configItem.Bins {
 		// TODO check configItem.Bins[i].Download == false and create a report function that only is called.
 		wg.Add(1)
 		go downloadBin(ctx, &wg, channel, client, httpClient, configItem.Bins[i].Owner, configItem.Bins[i].Repo, configItem.Bins[i].Cli, configItem.Bins[i].Tag, configItem.SaveLocation, configItem.Bins[i].Match, configItem.Bins[i].NonGithubURL)
-		fmt.Println("so much stuff")
 	}
 
 	wg.Wait()
 
-	// The for creates the issue...
-	for err := range channel {
+	select {
+	case err := <-channel:
 		if err != nil {
-			fmt.Printf("in the error cap: %v, len: %v \n", cap(channel), len(channel))
 			close(channel)
 			return err
 		}
+	default:
 	}
 
-	fmt.Println("I never come here")
 	close(channel)
 	return nil
 
