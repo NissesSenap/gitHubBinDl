@@ -113,7 +113,6 @@ For more detailed instructions you can look through this [medium article](https:
 
 ### priority number 1
 
-- Speed up bin download by using goroutine
 - If a current release exist of your cli support to save the old version
 - What build do you want to download? Windows, Darwin, Linux?
   - I think this works, but I need to verify on a windows computer CI to the rescue
