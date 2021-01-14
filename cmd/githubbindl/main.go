@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/NissesSenap/gitHubBinDl/build"
 	"github.com/NissesSenap/gitHubBinDl/pkg/app"
@@ -90,7 +89,6 @@ func main() {
 	// TODO set 5 as the default timeout value, ignore if HTTPtimeout = 0
 	httpClient := &http.Client{
 		Transport: tr,
-		Timeout:   time.Second * time.Duration(item.HTTPtimeout),
 	}
 
 	err = app.App(ctx, httpClient, &item)
