@@ -56,7 +56,7 @@ func App(ctx context.Context, httpClient *http.Client, configItem *config.Items)
 	for i := range configItem.Bins {
 		// TODO check configItem.Bins[i].Download == false and create a report function that only is called.
 		wg.Add(1)
-		go downloadBin(ctx, &wg, channel, client, httpClient, configItem.Bins[i].Owner, configItem.Bins[i].Repo, configItem.Bins[i].Cli, configItem.Bins[i].Tag, configItem.SaveLocation, configItem.Bins[i].Match, configItem.Bins[i].NonGithubURL, configItem.HTTPtimeout)
+		go downloadBin(ctx, &wg, channel, client, httpClient, configItem.Bins[i].Owner, configItem.Bins[i].Repo, configItem.Bins[i].Cli, configItem.Bins[i].Tag, configItem.SaveLocation, configItem.Bins[i].Match, configItem.Bins[i].NonGithubURL, configItem.Bins[i].Backup, configItem.HTTPtimeout)
 	}
 
 	// Blocking, waiting for the wg to finish
@@ -77,7 +77,7 @@ func App(ctx context.Context, httpClient *http.Client, configItem *config.Items)
 
 }
 
-func downloadBin(ctx context.Context, wg *sync.WaitGroup, channel chan error, client *github.Client, httpClient *http.Client, owner, repo, cliName, tag, saveLocation, pattern, nonGithubURL string, httpTimeout int) {
+func downloadBin(ctx context.Context, wg *sync.WaitGroup, channel chan error, client *github.Client, httpClient *http.Client, owner, repo, cliName, tag, saveLocation, pattern, nonGithubURL string, backup bool, httpTimeout int) {
 	defer wg.Done()
 
 	log := logr.FromContext(ctx)
@@ -101,7 +101,7 @@ func downloadBin(ctx context.Context, wg *sync.WaitGroup, channel chan error, cl
 		}
 		defer resp.Body.Close()
 
-		err = pickExtension(ctx, resp.Body, cliName, saveLocation, nonGithubURL)
+		err = pickExtension(ctx, resp.Body, cliName, saveLocation, nonGithubURL, backup)
 		if err != nil {
 			channel <- err
 			return
@@ -144,7 +144,7 @@ func downloadBin(ctx context.Context, wg *sync.WaitGroup, channel chan error, cl
 				channel <- err
 				return
 			}
-			err = pickExtension(ctx, rc, cliName, saveLocation, lowerAssetName)
+			err = pickExtension(ctx, rc, cliName, saveLocation, lowerAssetName, backup)
 			if err != nil {
 				channel <- err
 				return
@@ -158,8 +158,79 @@ func downloadBin(ctx context.Context, wg *sync.WaitGroup, channel chan error, cl
 	channel <- errors.New("Unable to find match")
 }
 
-func pickExtension(ctx context.Context, respBody io.ReadCloser, cliName, saveLocation, downloadURL string) error {
+// copyOldCli copies the current cli to the same location but with addition of _2006-01-02
+func copyOldCli(cliName, saveLocation string) error {
+	target := filepath.Join(saveLocation, cliName)
 
+	dst := target + "_" + time.Now().Local().Format("2006-01-02")
+
+	srcStat, err := os.Stat(target)
+	if err != nil {
+		return err
+	}
+	if !srcStat.Mode().IsRegular() {
+		// cannot copy non-regular files (e.g., directories,
+		// symlinks, devices, etc.)
+		return fmt.Errorf("CopyFile: non-regular source file %s (%q)", srcStat.Name(), srcStat.Mode().String())
+	}
+	dstStat, err := os.Stat(dst)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
+	} else {
+		if !(dstStat.Mode().IsRegular()) {
+			return fmt.Errorf("CopyFile: non-regular destination file %s (%q)", dstStat.Name(), dstStat.Mode().String())
+		}
+		// I don't understand how SameFile works, even though the files are copies of eachother they still return false.
+		// Well in some special case it could speed it up by not having to copy the data.
+		if os.SameFile(srcStat, dstStat) {
+			return nil
+		}
+	}
+	err = copyFileContents(target, dst, srcStat.Mode())
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// copyFileContents actually performs the copy and uses the existing FileMode to set the old one
+func copyFileContents(target, dst string, srcStat os.FileMode) error {
+	in, err := os.Open(target)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	err = os.Chmod(dst, srcStat)
+	if err != nil {
+		return err
+	}
+
+	if _, err = io.Copy(out, in); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func pickExtension(ctx context.Context, respBody io.ReadCloser, cliName, saveLocation, downloadURL string, backup bool) error {
+
+	log := logr.FromContext(ctx)
+
+	if backup {
+		err := copyOldCli(cliName, saveLocation)
+		if err != nil {
+			// The application will continue and instead overwrite the existing cliName
+			log.Info("msg", "Unable to save a old version of cli ", err)
+		}
+	}
 	switch filepath.Ext(downloadURL) {
 	case gzExtension:
 		err := untarGZ(ctx, saveLocation, cliName, respBody)

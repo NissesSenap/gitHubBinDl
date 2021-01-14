@@ -9,7 +9,6 @@ bins:
     owner: tektoncd
     repo: cli
     match: Linux_x86_64
-    #match: createaError
     baseURL: github.com
     download: true
   - cli: tkn.exe
@@ -17,7 +16,7 @@ bins:
     repo: cli
     match: Windows_x86_64
     baseURL: github.com
-    download: true
+    backup: true
   - cli: fluxctl
     owner: fluxcd
     repo: flux
