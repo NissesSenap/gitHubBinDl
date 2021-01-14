@@ -58,6 +58,7 @@ What values you can have under bin:
 | baseURL      | Github endpoint | https://my.github.enterprise.com | github.com |
 | download     | Downloaded package, if not it will just be reported | true | true |
 | nonGithubURL | A non github http server containing tar.gz or .zip fle. If used will ignore any github related config | https://get.helm.sh/helm-v3.4.2-linux-amd64.tar.gz | "" |
+| backup       | If true, it will create a copy of the old cli with todays date, example: tkn_2021_01_10 | true | false |
 
 ### Example config
 
@@ -75,6 +76,7 @@ bins:
     owner: tektoncd
     repo: cli
     match: Linux_x86_64
+    backup: true
   - cli: tkn.exe
     owner: tektoncd
     repo: cli

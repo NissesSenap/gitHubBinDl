@@ -10,6 +10,7 @@ type Bin struct {
 	BaseURL      string `yaml:"baseURL"`
 	Download     bool   `yaml:"download"`
 	NonGithubURL string `yaml:"nonGithubURL"`
+	Backup       bool   `yaml:"backup"`
 }
 
 // Items config file struct
