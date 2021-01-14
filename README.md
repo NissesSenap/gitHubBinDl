@@ -55,7 +55,7 @@ What values you can have under bin:
 | repo         | The github repo | cli | ""|
 | tag          | A specific tagged release, only support specific version downloads that is tagged. If not defined latest will be used | v0.13.0 | ""|
 | match        | How to know which archive to download, GitHubBinDl uses a simple regex match feature | Linux_x86_64 | "" |
-| baseURL      | Github endpoint | https://my.github.enterprise.com | github.com |
+| baseURL      | GitHub endpoint, must include a trailing /, should only be used by GitHub enterprise customers | https://api.mygithub.enterprise.com/ | https://api.github.com/ |
 | download     | Downloaded package, if not it will just be reported | true | true |
 | nonGithubURL | A non github http server containing tar.gz or .zip fle. If used will ignore any github related config | https://get.helm.sh/helm-v3.4.2-linux-amd64.tar.gz | "" |
 | backup       | If true, it will create a copy of the old cli with todays date, example: tkn_2021_01_10 | true | false |
@@ -81,13 +81,14 @@ bins:
     owner: tektoncd
     repo: cli
     match: Windows_x86_64
-    baseURL: https://my.github.enterprise.com
+    baseURL: https://api.mygithub.enterprise.com/
     download: false
   - cli: kubeseal.exe
     owner: bitnami-labs
     repo: sealed-secrets
     tag: v0.13.1
     match: kubeseal.exe
+    baseURL: https://api.github.com/
   - cli: helm
     nonGithubURL: https://get.helm.sh/helm-v3.4.2-linux-amd64.tar.gz
   - cli: helm.exe
@@ -115,7 +116,6 @@ For more detailed instructions you can look through this [medium article](https:
 
 ### priority number 1
 
-- If a current release exist of your cli support to save the old version
 - What build do you want to download? Windows, Darwin, Linux?
   - I think this works, but I need to verify on a windows computer CI to the rescue
 - Update Makefile to auto-update version nr
@@ -129,8 +129,6 @@ For more detailed instructions you can look through this [medium article](https:
 - validate path and url input in data.yaml
 - Just create a json report instead of download informing if a new version is available
   - use the download option in data.yaml
-- Support github enterprise by being able to define what github endpoint to use
-  - use the baseURL option in data.yaml
 - Write tests both unit and simple e2e
 - Write ctrl + c logic for nice shutdown
 - Support two-factor authentication

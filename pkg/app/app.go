@@ -11,6 +11,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -29,6 +30,7 @@ import (
 const zipExtension = ".zip"
 const gzExtension = ".gz"
 const exeExtension = ".exe"
+const dateFormat = "2006-01-02"
 
 // App start the app
 func App(ctx context.Context, httpClient *http.Client, configItem *config.Items) error {
@@ -56,7 +58,7 @@ func App(ctx context.Context, httpClient *http.Client, configItem *config.Items)
 	for i := range configItem.Bins {
 		// TODO check configItem.Bins[i].Download == false and create a report function that only is called.
 		wg.Add(1)
-		go downloadBin(ctx, &wg, channel, client, httpClient, configItem.Bins[i].Owner, configItem.Bins[i].Repo, configItem.Bins[i].Cli, configItem.Bins[i].Tag, configItem.SaveLocation, configItem.Bins[i].Match, configItem.Bins[i].NonGithubURL, configItem.Bins[i].Backup, configItem.HTTPtimeout)
+		go downloadBin(ctx, &wg, channel, client, httpClient, configItem.Bins[i], configItem.HTTPtimeout, configItem.SaveLocation)
 	}
 
 	// Blocking, waiting for the wg to finish
@@ -77,18 +79,18 @@ func App(ctx context.Context, httpClient *http.Client, configItem *config.Items)
 
 }
 
-func downloadBin(ctx context.Context, wg *sync.WaitGroup, channel chan error, client *github.Client, httpClient *http.Client, owner, repo, cliName, tag, saveLocation, pattern, nonGithubURL string, backup bool, httpTimeout int) {
+func downloadBin(ctx context.Context, wg *sync.WaitGroup, channel chan error, client *github.Client, httpClient *http.Client, binConfig config.Bin, httpTimeout int, saveLocation string) {
 	defer wg.Done()
 
 	log := logr.FromContext(ctx)
 
-	log.Info(nonGithubURL)
-	if nonGithubURL != "" {
+	log.Info(binConfig.NonGithubURL)
+	if binConfig.NonGithubURL != "" {
 		// Instead of using httpClient.Timeout I use a ctx with Deadline.
 		ctx, cancel := context.WithDeadline(ctx, time.Now().Add(time.Duration(httpTimeout)*time.Second))
 		defer cancel()
 
-		req, err := http.NewRequest(http.MethodGet, nonGithubURL, nil)
+		req, err := http.NewRequest(http.MethodGet, binConfig.NonGithubURL, nil)
 		if err != nil {
 			channel <- err
 			return
@@ -101,7 +103,7 @@ func downloadBin(ctx context.Context, wg *sync.WaitGroup, channel chan error, cl
 		}
 		defer resp.Body.Close()
 
-		err = pickExtension(ctx, resp.Body, cliName, saveLocation, nonGithubURL, backup)
+		err = pickExtension(ctx, resp.Body, binConfig.Cli, saveLocation, binConfig.NonGithubURL, binConfig.Backup)
 		if err != nil {
 			channel <- err
 			return
@@ -112,18 +114,28 @@ func downloadBin(ctx context.Context, wg *sync.WaitGroup, channel chan error, cl
 	var resp *github.RepositoryRelease
 	var er error
 
+	// check if BaseURL is empty, if not it will use that when talking to the github api
+	if binConfig.BaseURL != "" {
+		githubURL, err := url.Parse(binConfig.BaseURL)
+		if err != nil {
+			channel <- er
+			return
+		}
+		client.BaseURL = githubURL
+	}
+
 	// If tag is empty use GetReleaseByTag
-	if tag != "" {
+	if binConfig.Tag != "" {
 		// response gives information about rate limit etc. I assume I will get an error if i go over my rate limit
 		// TODO here a log.debug would be nice...
-		resp, _, er = client.Repositories.GetReleaseByTag(ctx, owner, repo, tag)
+		resp, _, er = client.Repositories.GetReleaseByTag(ctx, binConfig.Owner, binConfig.Repo, binConfig.Tag)
 		if er != nil {
 			channel <- er
 			return
 		}
 
 	} else {
-		resp, _, er = client.Repositories.GetLatestRelease(ctx, owner, repo)
+		resp, _, er = client.Repositories.GetLatestRelease(ctx, binConfig.Owner, binConfig.Repo)
 		if er != nil {
 			channel <- er
 			return
@@ -133,18 +145,18 @@ func downloadBin(ctx context.Context, wg *sync.WaitGroup, channel chan error, cl
 	for _, asset := range resp.Assets {
 		log.Info(*asset.Name)
 		lowerAssetName := strings.ToLower(*asset.Name)
-		patternMatched, err := regexp.MatchString(strings.ToLower(pattern), lowerAssetName)
+		patternMatched, err := regexp.MatchString(strings.ToLower(binConfig.Match), lowerAssetName)
 		if err != nil {
 			channel <- err
 			return
 		}
 		if patternMatched {
-			rc, _, err := client.Repositories.DownloadReleaseAsset(ctx, owner, repo, *asset.ID, httpClient)
+			rc, _, err := client.Repositories.DownloadReleaseAsset(ctx, binConfig.Owner, binConfig.Repo, *asset.ID, httpClient)
 			if err != nil {
 				channel <- err
 				return
 			}
-			err = pickExtension(ctx, rc, cliName, saveLocation, lowerAssetName, backup)
+			err = pickExtension(ctx, rc, binConfig.Cli, saveLocation, lowerAssetName, binConfig.Backup)
 			if err != nil {
 				channel <- err
 				return
@@ -162,7 +174,7 @@ func downloadBin(ctx context.Context, wg *sync.WaitGroup, channel chan error, cl
 func copyOldCli(cliName, saveLocation string) error {
 	target := filepath.Join(saveLocation, cliName)
 
-	dst := target + "_" + time.Now().Local().Format("2006-01-02")
+	dst := target + "_" + time.Now().Local().Format(dateFormat)
 
 	srcStat, err := os.Stat(target)
 	if err != nil {

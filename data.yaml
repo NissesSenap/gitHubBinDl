@@ -9,13 +9,12 @@ bins:
     owner: tektoncd
     repo: cli
     match: Linux_x86_64
-    baseURL: github.com
+    baseURL: https://api.github.com/
     download: true
   - cli: tkn.exe
     owner: tektoncd
     repo: cli
     match: Windows_x86_64
-    baseURL: github.com
     backup: true
   - cli: fluxctl
     owner: fluxcd
