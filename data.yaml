@@ -11,6 +11,10 @@ bins:
     match: Linux_x86_64
     baseURL: https://api.github.com/
     download: true
+    completionLocation: /tmp/tkn-completion.sh
+    completionArgs:
+      - completion
+      - bash
   - cli: tkn.exe
     owner: tektoncd
     repo: cli
@@ -27,5 +31,9 @@ bins:
     match: kubeseal.exe
   - cli: helm
     nonGithubURL: https://get.helm.sh/helm-v3.4.2-linux-amd64.tar.gz
+    completionLocation: /tmp/tkn-helm.sh
+    completionArgs:
+      - completion
+      - zsh
   - cli: helm.exe
     nonGithubURL: https://get.helm.sh/helm-v3.4.2-windows-amd64.zip

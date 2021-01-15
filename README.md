@@ -48,17 +48,19 @@ data.yaml supports the following values:
 
 What values you can have under bin:
 
-| Bins         | Comment | Example | Default |
-| ------------ | :------ | :-------| ------: |
-| - cli        | The name of the cli, it have to be exact since it used to match when unpacking the archive | tkn | "" |
-| owner        | The github owner |tektoncd | ""|
-| repo         | The github repo | cli | ""|
-| tag          | A specific tagged release, only support specific version downloads that is tagged. If not defined latest will be used | v0.13.0 | ""|
-| match        | How to know which archive to download, GitHubBinDl uses a simple regex match feature | Linux_x86_64 | "" |
-| baseURL      | GitHub endpoint, must include a trailing /, should only be used by GitHub enterprise customers | https://api.mygithub.enterprise.com/ | https://api.github.com/ |
-| download     | Downloaded package, if not it will just be reported | true | true |
-| nonGithubURL | A non github http server containing tar.gz or .zip fle. If used will ignore any github related config | https://get.helm.sh/helm-v3.4.2-linux-amd64.tar.gz | "" |
-| backup       | If true, it will create a copy of the old cli with todays date, example: tkn_2021_01_10 | true | false |
+| Bins               | Comment | Example | Default |
+| ------------------ | :------ | :-------| ------: |
+| - cli              | The name of the cli, it have to be exact since it used to match when unpacking the archive | tkn | "" |
+| owner              | The github owner |tektoncd | ""|
+| repo               | The github repo | cli | ""|
+| tag                | A specific tagged release, only support specific version downloads that is tagged. If not defined latest will be used | v0.13.0 | ""|
+| match              | How to know which archive to download, GitHubBinDl uses a simple regex match feature | Linux_x86_64 | "" |
+| baseURL            | GitHub endpoint, must include a trailing /, should only be used by GitHub enterprise customers | https://api.mygithub.enterprise.com/ | https://api.github.com/ |
+| download           | Downloaded package, if not it will just be reported | true | true |
+| nonGithubURL       | A non github http server containing tar.gz or .zip fle. If used will ignore any github related config | https://get.helm.sh/helm-v3.4.2-linux-amd64.tar.gz | "" |
+| backup             | If true, it will create a copy of the old cli with todays date, example: tkn_2021_01_10 | true | false |
+| completionLocation | If set, it will use the newly downloaded bin and generate a completion file, must be the complete path including fileExtension. For more info see [completion generation](#completion-generation) | /tmp/tkn-completion.sh | "" |
+| completionArgs     | A list of arguments needed to generate the completion output, one argument per line | - completion - bash | "" |
 
 ### Example config
 
@@ -77,6 +79,10 @@ bins:
     repo: cli
     match: Linux_x86_64
     backup: true
+    completionLocation: /tmp/tkn-completion.sh
+    completionArgs:
+      - completion
+      - bash
   - cli: tkn.exe
     owner: tektoncd
     repo: cli
@@ -112,6 +118,16 @@ Go to [github.com](github.com) -> settings -> Developer settings -> Personal acc
 
 For more detailed instructions you can look through this [medium article](https://medium.com/@durgaprasadbudhwani/playing-with-github-api-with-go-github-golang-library-83e28b2ff093).
 
+### Completion generation
+
+There is no verification of the command or the output. The application just takes the full path of completionLocation.
+Runs it assuming it got access to run and add the arguments that supplied in completionArgs in that order.
+
+Sadly both tkn & helm both performs a exit 0 even if you provide a incorrect input value for completion.
+`helm completion foo == exit 0` even though foo is not a supported option.
+
+After the completion file is generated there is no verification that the file contains any completion code.
+
 ## TODO
 
 ### priority number 1
@@ -122,15 +138,10 @@ For more detailed instructions you can look through this [medium article](https:
 
 ### priority number 2
 
-- Be able to auto generate new bash/zsh auto-complete
-  - We will need to provide a command on how to do this in your config file
-  - Also need to define where to store the auto-complete file
 - Be able to auto ignore rc/alpha releases
 - validate path and url input in data.yaml
 - Just create a json report instead of download informing if a new version is available
   - use the download option in data.yaml
 - Write tests both unit and simple e2e
-- Write ctrl + c logic for nice shutdown
-- Support two-factor authentication
 - Not for this project but it would be fun to have a auto-builder for pacman & flatpack of new binary files
 - Verify checksum, the issue here is that github don't store checksum in the github API and there is no standard to store them. This won't most likely happen.

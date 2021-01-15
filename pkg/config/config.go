@@ -2,15 +2,17 @@ package config
 
 // Bin a representation on what to download
 type Bin struct {
-	Cli          string `yaml:"cli"`
-	Owner        string `yaml:"owner"`
-	Repo         string `yaml:"repo"`
-	Tag          string `yaml:"tag"`
-	Match        string `yaml:"match"`
-	BaseURL      string `yaml:"baseURL"`
-	Download     bool   `yaml:"download"`
-	NonGithubURL string `yaml:"nonGithubURL"`
-	Backup       bool   `yaml:"backup"`
+	Cli                string   `yaml:"cli"`
+	Owner              string   `yaml:"owner"`
+	Repo               string   `yaml:"repo"`
+	Tag                string   `yaml:"tag"`
+	Match              string   `yaml:"match"`
+	BaseURL            string   `yaml:"baseURL"`
+	Download           bool     `yaml:"download"`
+	NonGithubURL       string   `yaml:"nonGithubURL"`
+	Backup             bool     `yaml:"backup"`
+	CompletionLocation string   `yaml:"completionLocation"`
+	CompletionArgs     []string `yaml:"completionArgs"`
 }
 
 // Items config file struct
