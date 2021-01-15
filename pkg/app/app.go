@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -108,6 +109,15 @@ func downloadBin(ctx context.Context, wg *sync.WaitGroup, channel chan error, cl
 			channel <- err
 			return
 		}
+
+		if binConfig.CompletionLocation != "" {
+			err := saveCompletion(ctx, saveLocation, binConfig.Cli, binConfig.CompletionLocation, binConfig.CompletionArgs)
+			if err != nil {
+				channel <- err
+				return
+			}
+		}
+		// Generate the completion file
 		return
 	}
 
@@ -160,6 +170,15 @@ func downloadBin(ctx context.Context, wg *sync.WaitGroup, channel chan error, cl
 			if err != nil {
 				channel <- err
 				return
+			}
+
+			// Generate the completion file
+			if binConfig.CompletionLocation != "" {
+				err := saveCompletion(ctx, saveLocation, binConfig.Cli, binConfig.CompletionLocation, binConfig.CompletionArgs)
+				if err != nil {
+					channel <- err
+					return
+				}
 			}
 
 			return
@@ -297,6 +316,40 @@ func saveFile(ctx context.Context, dst, cliName string, rc io.Reader) error {
 		return err
 	}
 	return nil
+}
+
+func saveCompletion(ctx context.Context, cliLocation, cliName, completionLocation string, completionCommand []string) error {
+	log := logr.FromContext(ctx)
+	command := exec.Command(filepath.Join(cliLocation, cliName))
+
+	// Instead of using a for loop with append you can use ... to unpack the list S1011
+	command.Args = append(command.Args, completionCommand...)
+
+	var out bytes.Buffer
+
+	// set the output to our variable
+	command.Stdout = &out
+	err := command.Run()
+	if err != nil {
+		return err
+	}
+	log.Info("Managed to run completion command")
+
+	f, err := os.OpenFile(completionLocation, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.FileMode(0755))
+	if err != nil {
+		return err
+	}
+
+	_, err = out.WriteTo(f)
+	if err != nil {
+		return err
+	}
+	//CLOSE THE FILE
+	if err := f.Close(); err != nil {
+		return err
+	}
+	return nil
+
 }
 
 func makeDirectoryIfNotExists(path string) error {
