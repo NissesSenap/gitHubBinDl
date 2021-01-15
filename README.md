@@ -145,3 +145,7 @@ After the completion file is generated there is no verification that the file co
 - Write tests both unit and simple e2e
 - Not for this project but it would be fun to have a auto-builder for pacman & flatpack of new binary files
 - Verify checksum, the issue here is that github don't store checksum in the github API and there is no standard to store them. This won't most likely happen.
+
+## Tests
+
+go test -run Get ./... 

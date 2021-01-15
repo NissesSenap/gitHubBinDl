@@ -26,13 +26,24 @@ func TestMain(t *testing.T) {
 	// unmarshal the data
 	_ = yaml.Unmarshal(source, &item)
 
+	// Create a list of all the items from the configFile
 	var downloadItems []string
 	for i := range item.Bins {
 		downloadItems = append(downloadItems, filepath.Join(item.SaveLocation, item.Bins[i].Cli))
 	}
 
-	// The /* is due to that the location might be missing a final /, even if it do it won't create any issues
-	files, _ := filepath.Glob(filepath.Join(item.SaveLocation + "/*"))
+	// Create a list of files that Is possible to stat
+	var statFiles []string
+	for _, fileLocation := range downloadItems {
+		srcStat, err := os.Stat(fileLocation)
+		if err != nil {
+			t.Errorf("One or more files is missing %v", err)
+		}
+		if srcStat.Mode().IsRegular() {
+			statFiles = append(statFiles, fileLocation)
+		}
+	}
 
-	assert.ElementsMatch(t, downloadItems, files)
+	// compare what should exists with what actually is saved on disk
+	assert.ElementsMatch(t, downloadItems, statFiles)
 }

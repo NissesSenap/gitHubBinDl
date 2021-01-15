@@ -318,6 +318,7 @@ func saveFile(ctx context.Context, dst, cliName string, rc io.Reader) error {
 	return nil
 }
 
+// saveCompletion runs the completionCommand and saves the output in a file
 func saveCompletion(ctx context.Context, cliLocation, cliName, completionLocation string, completionCommand []string) error {
 	log := logr.FromContext(ctx)
 	command := exec.Command(filepath.Join(cliLocation, cliName))
@@ -349,7 +350,6 @@ func saveCompletion(ctx context.Context, cliLocation, cliName, completionLocatio
 		return err
 	}
 	return nil
-
 }
 
 func makeDirectoryIfNotExists(path string) error {
