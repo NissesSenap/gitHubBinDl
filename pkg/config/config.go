@@ -38,8 +38,23 @@ type Items struct {
 	SaveLocation string `yaml:"saveLocation"`
 }
 
-const configFile = "configfile"
-const defaultConfigFile = "data.yaml"
+// default Keys & values for global values lik saveLocation & HttpTimeout, notice that only the keys are Global
+const (
+	DefaultGITHUBAPIKEYKey   = "gitHubAPIkey"
+	defaultGITHUBAPIKEYValue = ""
+
+	DefaultConfigFileKey   = "configfile"
+	defaultConfigFileValue = "data.yaml"
+
+	DefaultHTTPtimeoutkey   = "httpTimeout"
+	defaultHTTPtimeoutValue = 5
+
+	DefaultHTTPinsecureKey   = "httpInsecure"
+	defaultHTTPinsecureValue = false
+
+	DefaultSaveLocationKey = "saveLocation"
+	// defaultSaveLocationValue is defined in ManageConfig()
+)
 
 // ManageConfig read all the user input and returns Items
 func ManageConfig(ctx context.Context) (Items, error) {
@@ -51,7 +66,7 @@ func ManageConfig(ctx context.Context) (Items, error) {
 	if err != nil {
 		return item, err
 	}
-	defaultsaveLocation := filepath.Join(homedir, "gitGubBinDL"+"_"+time.Now().Local().Format(util.DateFormat))
+	defaultSaveLocationValue := filepath.Join(homedir, "gitGubBinDL"+"_"+time.Now().Local().Format(util.DateFormat))
 
 	//var filename string
 	err = readCli()
@@ -59,17 +74,18 @@ func ManageConfig(ctx context.Context) (Items, error) {
 		return item, err
 	}
 
-	// defaults
-	viper.SetDefault(configFile, defaultConfigFile)
-	viper.SetDefault("httpTimeout", 5)
-	viper.SetDefault("httpInsecure", false)
-	viper.SetDefault("saveLocation", defaultsaveLocation)
+	// set default value
+	viper.SetDefault(DefaultGITHUBAPIKEYKey, defaultGITHUBAPIKEYValue)
+	viper.SetDefault(DefaultConfigFileKey, defaultConfigFileValue)
+	viper.SetDefault(DefaultHTTPtimeoutkey, defaultHTTPtimeoutValue)
+	viper.SetDefault(DefaultHTTPinsecureKey, defaultHTTPinsecureValue)
+	viper.SetDefault(DefaultSaveLocationKey, defaultSaveLocationValue)
 
 	// Run initial to look if env FILE exists to manage the config
 	viper.AutomaticEnv()
 
 	// Grab the value from viper that we got from readCli()
-	configValue := viper.GetString(configFile)
+	configValue := viper.GetString(DefaultConfigFileKey)
 	log.Info(configValue)
 
 	dir, file := filepath.Split(configValue)
@@ -96,7 +112,7 @@ func ManageConfig(ctx context.Context) (Items, error) {
 func readCli() error {
 
 	help := pflag.BoolP("help", "h", false, "prints the help output.")
-	_ = pflag.StringP(configFile, "c", "", "Configfile to read data from, default data.yaml")
+	_ = pflag.StringP(DefaultConfigFileKey, "c", "", "Configfile to read data from, default data.yaml")
 	version := pflag.BoolP("version", "v", false, "print application version.")
 	//pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()

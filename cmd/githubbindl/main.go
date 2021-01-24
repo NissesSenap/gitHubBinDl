@@ -43,7 +43,7 @@ func main() {
 
 	item, err := config.ManageConfig(ctx)
 	if err != nil {
-		log.Error(err, "Unable to parse confiig")
+		log.Error(err, "Unable to parse config")
 		os.Exit(1)
 	}
 	// creates http client if needed for a redirect
