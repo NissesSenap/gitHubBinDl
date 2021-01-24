@@ -21,6 +21,8 @@ import (
 	"time"
 
 	"github.com/NissesSenap/gitHubBinDl/pkg/config"
+	"github.com/NissesSenap/gitHubBinDl/pkg/util"
+	"github.com/spf13/viper"
 
 	"github.com/go-logr/logr"
 	"golang.org/x/oauth2"
@@ -31,17 +33,20 @@ import (
 const zipExtension = ".zip"
 const gzExtension = ".gz"
 const exeExtension = ".exe"
-const dateFormat = "2006-01-02"
 
 // App start the app
 func App(ctx context.Context, httpClient *http.Client, configItem *config.Items) error {
+	log := logr.FromContext(ctx)
+
 	// TODO find a way to use configItem.Bins[0].BaseURL to download files from custom github endpoints
 	client := github.NewClient(nil)
 
+	gitHubAPIkey := viper.GetString("gitHubAPIkey")
+	log.Info(gitHubAPIkey)
 	// If no githuBAPIToken is specified the application runs without it
-	if configItem.GitHubAPIkey != "" {
+	if gitHubAPIkey != "" {
 		tokenService := oauth2.StaticTokenSource(
-			&oauth2.Token{AccessToken: configItem.GitHubAPIkey},
+			&oauth2.Token{AccessToken: gitHubAPIkey},
 		)
 		tokenClient := oauth2.NewClient(ctx, tokenService)
 
@@ -49,7 +54,7 @@ func App(ctx context.Context, httpClient *http.Client, configItem *config.Items)
 	}
 
 	// Create the download folder if needed
-	if err := makeDirectoryIfNotExists(configItem.SaveLocation); err != nil {
+	if err := util.MakeDirectoryIfNotExists(viper.GetString("saveLocation")); err != nil {
 		return err
 	}
 
@@ -193,7 +198,7 @@ func downloadBin(ctx context.Context, wg *sync.WaitGroup, channel chan error, cl
 func copyOldCli(cliName, saveLocation string) error {
 	target := filepath.Join(saveLocation, cliName)
 
-	dst := target + "_" + time.Now().Local().Format(dateFormat)
+	dst := target + "_" + time.Now().Local().Format(util.DateFormat)
 
 	srcStat, err := os.Stat(target)
 	if err != nil {
@@ -348,13 +353,6 @@ func saveCompletion(ctx context.Context, cliLocation, cliName, completionLocatio
 	//CLOSE THE FILE
 	if err := f.Close(); err != nil {
 		return err
-	}
-	return nil
-}
-
-func makeDirectoryIfNotExists(path string) error {
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return os.Mkdir(path, os.ModeDir|0755)
 	}
 	return nil
 }

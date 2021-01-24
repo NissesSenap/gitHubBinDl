@@ -43,7 +43,7 @@ data.yaml supports the following values:
 | githubAPIkey   | Your github API key | myAPIkey | "" |
 | httpTimeout    | The http timeout in seconds | 5 | 5 |
 | httpInsecure   | Allow https without verified certificate | true | false |
-| saveLocation   | Where your binary files will be saved | /usr/local/bin | /tmp/todays-date |
+| saveLocation   | Where your binary files will be saved | /usr/local/bin | $HOME/gitGubBinDL_\<todays date\> |
 | bins           | A list of binaries to download | see bellow | ""|
 
 What values you can have under bin:
@@ -108,7 +108,7 @@ The precedence for flag value sources is as follows (highest to lowest):
 0. Command line flag value from user
 1. Environment variable (if specified)
 2. Configuration file value
-3. Default defined on the flag
+3. Default value
 
 ### Create a GitHub token
 
@@ -148,4 +148,4 @@ After the completion file is generated there is no verification that the file co
 
 ## Tests
 
-go test -run Get ./... 
+go test -run Get ./...
