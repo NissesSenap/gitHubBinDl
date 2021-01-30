@@ -2,14 +2,16 @@ package config
 
 import (
 	"context"
-	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
+	"path/filepath"
+	"time"
 
 	"github.com/NissesSenap/gitHubBinDl/build"
+	"github.com/NissesSenap/gitHubBinDl/pkg/util"
 	"github.com/go-logr/logr"
-	"gopkg.in/yaml.v2"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 )
 
 // Bin a representation on what to download
@@ -36,55 +38,91 @@ type Items struct {
 	SaveLocation string `yaml:"saveLocation"`
 }
 
+// default Keys & values for global values lik saveLocation & HttpTimeout, notice that only the keys are Global
+const (
+	DefaultGITHUBAPIKEYKey   = "gitHubAPIkey"
+	defaultGITHUBAPIKEYValue = ""
+
+	DefaultConfigFileKey   = "configfile"
+	defaultConfigFileValue = "data.yaml"
+
+	DefaultHTTPtimeoutkey   = "httpTimeout"
+	defaultHTTPtimeoutValue = 5
+
+	DefaultHTTPinsecureKey   = "httpInsecure"
+	defaultHTTPinsecureValue = false
+
+	DefaultSaveLocationKey = "saveLocation"
+	// defaultSaveLocationValue is defined in ManageConfig()
+)
+
 // ManageConfig read all the user input and returns Items
-func ManageConfig(ctx context.Context) Items {
+func ManageConfig(ctx context.Context) (Items, error) {
 	log := logr.FromContext(ctx)
-	var filename string
-	configFile := readCli()
-
-	if *configFile == "" {
-		filename = getEnv(ctx, "CONFIGFILE", "data.yaml")
-	} else {
-		filename = *configFile
-	}
-
-	log.Info("", "Configfilename:", filename)
 	var item Items
 
-	// Read the config file
-	source, err := ioutil.ReadFile(filename)
+	// default value for saveLocation is user homedir + gitGubBinDL_<todays-date> example: 2021-01-24
+	homedir, err := os.UserHomeDir()
 	if err != nil {
-		log.Error(err, "Unable to read configfile")
-		os.Exit(1)
+		return item, err
 	}
+	defaultSaveLocationValue := filepath.Join(homedir, "gitGubBinDL"+"_"+time.Now().Local().Format(util.DateFormat))
 
-	// unmarshal the data
-	err = yaml.Unmarshal(source, &item)
+	//var filename string
+	err = readCli()
 	if err != nil {
-		log.Error(err, "Unable to read values from configfile")
-		os.Exit(1)
-
+		return item, err
 	}
 
-	// TODO log.Debug("config" item) don't work need some basic help here
-	//fmt.Printf("config: %v", item)
+	// set default value
+	viper.SetDefault(DefaultGITHUBAPIKEYKey, defaultGITHUBAPIKEYValue)
+	viper.SetDefault(DefaultConfigFileKey, defaultConfigFileValue)
+	viper.SetDefault(DefaultHTTPtimeoutkey, defaultHTTPtimeoutValue)
+	viper.SetDefault(DefaultHTTPinsecureKey, defaultHTTPinsecureValue)
+	viper.SetDefault(DefaultSaveLocationKey, defaultSaveLocationValue)
 
-	apiKEY := getEnv(ctx, "GITHUBAPIKEY", "")
-	if apiKEY != "" {
-		item.GitHubAPIkey = apiKEY
+	// Run initial to look if env FILE exists to manage the config
+	viper.AutomaticEnv()
+
+	// Grab the value from viper that we got from readCli()
+	configValue := viper.GetString(DefaultConfigFileKey)
+	log.Info(configValue)
+
+	dir, file := filepath.Split(configValue)
+	log.Info("Config:", dir, file)
+	viper.SetConfigName(file)
+	viper.SetConfigType("yaml")
+
+	viper.AddConfigPath(dir)
+	viper.AddConfigPath(".")
+	err = viper.ReadInConfig()
+	if err != nil {
+		return item, err
+	}
+	err = viper.Unmarshal(&item)
+	if err != nil {
+		return item, err
 	}
 
-	return item
+	// run again to get the values from the config file like GITHUBAPIKEY
+	viper.AutomaticEnv()
+	return item, nil
 }
 
-func readCli() *string {
-	help := flag.Bool("help", false, "prints the help output.")
-	configfile := flag.String("f", "", "Configfile to read data from, default data.yaml")
-	version := flag.Bool("version", false, "print application version.")
-	flag.Parse()
+func readCli() error {
+
+	help := pflag.BoolP("help", "h", false, "prints the help output.")
+	_ = pflag.StringP(DefaultConfigFileKey, "c", "", "Configfile to read data from, default data.yaml")
+	version := pflag.BoolP("version", "v", false, "print application version.")
+	//pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+	pflag.Parse()
+	err := viper.BindPFlags(pflag.CommandLine)
+	if err != nil {
+		return err
+	}
 
 	if *help {
-		flag.PrintDefaults()
+		pflag.PrintDefaults()
 		os.Exit(0)
 	}
 
@@ -92,8 +130,7 @@ func readCli() *string {
 		fmt.Printf("githubBinDl Version: %s, BuildDate: %s", build.Version, build.BuildDate)
 		os.Exit(0)
 	}
-
-	return configfile
+	return nil
 }
 
 // getEnv get key environment variable if exist otherwise return defalutValue
