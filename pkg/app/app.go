@@ -34,6 +34,8 @@ const zipExtension = ".zip"
 const gzExtension = ".gz"
 const exeExtension = ".exe"
 
+const maxFileSize = 104857600 //1024*1024*100 aka 100 Mb
+
 // App start the app
 func App(ctx context.Context, httpClient *http.Client, configItem *config.Items) error {
 	log := logr.FromContext(ctx)
@@ -235,10 +237,6 @@ func copyOldCli(cliName, saveLocation string) error {
 
 // copyFileContents actually performs the copy and uses the existing FileMode to set the old one
 func copyFileContents(target, dst string, srcStat os.FileMode) (err error) {
-	if !strings.HasPrefix(target, filepath.Clean(dst)+string(os.PathSeparator)) {
-		return fmt.Errorf("%s: illegal file path", target)
-	}
-
 	in, err := os.Open(target) // #nosec G304
 	if err != nil {
 		return err
@@ -439,6 +437,10 @@ func untarGZ(ctx context.Context, dst, cliName string, r io.Reader) error {
 					return fmt.Errorf("%s: illegal file path", target)
 				}
 
+				// Fix G110 max size of a unpacked file, still don't take memory in to consideration but it shouldn't fil your disk to much
+				if header.Size > maxFileSize {
+					return fmt.Errorf("%v: is %v which is bigger than allowed maxFileSize %v byte", cleanHeader, header.Size, maxFileSize)
+				}
 				// TODO change to some debug...
 				log.Info(cleanHeader)
 				/* Since I only untar the cli it self I enforce 0755
@@ -450,6 +452,7 @@ func untarGZ(ctx context.Context, dst, cliName string, r io.Reader) error {
 				}
 
 				// copy over contents
+				/* #nosec G110*/
 				if _, err := io.Copy(file, tr); err != nil {
 					return err
 				}
