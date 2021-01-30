@@ -235,7 +235,11 @@ func copyOldCli(cliName, saveLocation string) error {
 
 // copyFileContents actually performs the copy and uses the existing FileMode to set the old one
 func copyFileContents(target, dst string, srcStat os.FileMode) (err error) {
-	in, err := os.Open(target)
+	if !strings.HasPrefix(target, filepath.Clean(dst)+string(os.PathSeparator)) {
+		return fmt.Errorf("%s: illegal file path", target)
+	}
+
+	in, err := os.Open(target) // #nosec G304
 	if err != nil {
 		return err
 	}
@@ -324,7 +328,10 @@ func saveFile(ctx context.Context, dst, cliName string, rc io.Reader) error {
 	}
 
 	target := filepath.Join(dst, cliName)
-	f, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.FileMode(0755))
+	if !strings.HasPrefix(target, filepath.Clean(dst)+string(os.PathSeparator)) {
+		return fmt.Errorf("%s: illegal file path", target)
+	}
+	f, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.FileMode(0755)) // #nosec G304
 	if err != nil {
 		return err
 	}
@@ -359,7 +366,7 @@ func saveCompletion(ctx context.Context, cliLocation, cliName, completionLocatio
 	}
 	log.Info("Managed to run completion command")
 
-	f, err := os.OpenFile(completionLocation, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.FileMode(0755))
+	f, err := os.OpenFile(completionLocation, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.FileMode(0755)) // #nosec G304
 	if err != nil {
 		return err
 	}
@@ -428,13 +435,16 @@ func untarGZ(ctx context.Context, dst, cliName string, r io.Reader) error {
 		case tar.TypeReg:
 			// Only write the cliFile
 			if cleanHeader == cliName {
+				if !strings.HasPrefix(target, filepath.Clean(dst)+string(os.PathSeparator)) {
+					return fmt.Errorf("%s: illegal file path", target)
+				}
 
 				// TODO change to some debug...
 				log.Info(cleanHeader)
 				/* Since I only untar the cli it self I enforce 0755
 				   else use os.FileMode(header.Mode) to get what the filed had when it was tared.
 				*/
-				file, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(0755))
+				file, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(0755)) // #nosec G304
 				if err != nil {
 					return err
 				}
@@ -477,7 +487,7 @@ func unZIP(ctx context.Context, dst, cliName string, r []byte) error {
 				return fmt.Errorf("%s: illegal file path", target)
 			}
 
-			outFile, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+			outFile, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode()) // #nosec G304
 			if err != nil {
 				return err
 			}
