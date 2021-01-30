@@ -234,17 +234,33 @@ func copyOldCli(cliName, saveLocation string) error {
 }
 
 // copyFileContents actually performs the copy and uses the existing FileMode to set the old one
-func copyFileContents(target, dst string, srcStat os.FileMode) error {
+func copyFileContents(target, dst string, srcStat os.FileMode) (err error) {
 	in, err := os.Open(target)
 	if err != nil {
 		return err
 	}
-	defer in.Close()
+
+	// Instead of defer in.Close() that doesent look for the error of os.Close use a defer wrapper and return using named variable
+	// A bit to magical but I don't have to remember if i did the close on the correct place or not.
+	// https://www.joeshaw.org/dont-defer-close-on-writable-files/
+	defer func() {
+		cerr := in.Close()
+		if err == nil {
+			err = cerr
+		}
+	}()
+
 	out, err := os.Create(dst)
 	if err != nil {
 		return err
 	}
-	defer out.Close()
+
+	defer func() {
+		cerr := out.Close()
+		if err == nil {
+			err = cerr
+		}
+	}()
 
 	err = os.Chmod(dst, srcStat)
 	if err != nil {
