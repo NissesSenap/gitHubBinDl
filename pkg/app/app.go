@@ -35,6 +35,7 @@ const gzExtension = ".gz"
 const exeExtension = ".exe"
 
 const maxFileSize = 104857600 //1024*1024*100 aka 100 Mb
+var nonOkCommands = []string{"sudo", "rm", "ln", "sed", "awk", "|", "&"}
 
 // App start the app
 func App(ctx context.Context, httpClient *http.Client, configItem *config.Items) error {
@@ -349,7 +350,18 @@ func saveFile(ctx context.Context, dst, cliName string, rc io.Reader) error {
 // saveCompletion runs the completionCommand and saves the output in a file
 func saveCompletion(ctx context.Context, cliLocation, cliName, completionLocation string, completionCommand []string) error {
 	log := logr.FromContext(ctx)
-	command := exec.Command(filepath.Join(cliLocation, cliName))
+
+	// check to see if the provided completion command contain any potentially dangerous commands
+	for _, commands := range completionCommand {
+		for _, noCommands := range nonOkCommands {
+			if commands == noCommands {
+				return fmt.Errorf("completionArg %v, contains non ok provided command: %v", commands, noCommands)
+			}
+		}
+	}
+
+	// Ignoring G204, trying to mitigate it as much as possible by going through non ok commands before running the command
+	command := exec.Command(filepath.Join(cliLocation, cliName)) // #nosec G204
 
 	// Instead of using a for loop with append you can use ... to unpack the list S1011
 	command.Args = append(command.Args, completionCommand...)
