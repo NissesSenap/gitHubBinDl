@@ -34,9 +34,6 @@ const zipExtension = ".zip"
 const gzExtension = ".gz"
 const exeExtension = ".exe"
 
-const maxFileSize = 104857600 //1024*1024*100 aka 100 Mb
-var nonOkCommands = []string{"sudo", "rm", "ln", "sed", "awk", "|", "&"}
-
 // App start the app
 func App(ctx context.Context, httpClient *http.Client, configItem *config.Items) error {
 	log := logr.FromContext(ctx)
@@ -296,11 +293,7 @@ func pickExtension(ctx context.Context, respBody io.ReadCloser, cliName, saveLoc
 		}
 		return nil
 	case zipExtension:
-		zipRespBody, err := ioutil.ReadAll(respBody)
-		if err != nil {
-			return err
-		}
-		err = unZIP(ctx, saveLocation, cliName, zipRespBody)
+		err := unZIP(ctx, saveLocation, cliName, respBody)
 		if err != nil {
 			return err
 		}
@@ -353,7 +346,7 @@ func saveCompletion(ctx context.Context, cliLocation, cliName, completionLocatio
 
 	// check to see if the provided completion command contain any potentially dangerous commands
 	for _, commands := range completionCommand {
-		for _, noCommands := range nonOkCommands {
+		for _, noCommands := range viper.GetStringSlice(config.DefaultNotOkCompletionArgsKey) {
 			if commands == noCommands {
 				return fmt.Errorf("completionArg %v, contains non ok provided command: %v", commands, noCommands)
 			}
@@ -449,7 +442,9 @@ func untarGZ(ctx context.Context, dst, cliName string, r io.Reader) error {
 					return fmt.Errorf("%s: illegal file path", target)
 				}
 
+				maxFileSize := viper.GetInt64(config.DefaultMaxFileSizeKey)
 				// Fix G110 max size of a unpacked file, still don't take memory in to consideration but it shouldn't fil your disk to much
+				//gitHubAPIkey := viper.GetString(config.DefaultGITHUBAPIKEYKey)
 				if header.Size > maxFileSize {
 					return fmt.Errorf("%v: is %v which is bigger than allowed maxFileSize %v byte", cleanHeader, header.Size, maxFileSize)
 				}
@@ -481,10 +476,15 @@ func untarGZ(ctx context.Context, dst, cliName string, r io.Reader) error {
 }
 
 // unZIP unzip files and put the result in any folder you want
-func unZIP(ctx context.Context, dst, cliName string, r []byte) error {
+func unZIP(ctx context.Context, dst, cliName string, respBody io.Reader) error {
 	log := logr.FromContext(ctx)
 
-	zipReader, err := zip.NewReader(bytes.NewReader(r), int64(len(r)))
+	zipRespBody, err := ioutil.ReadAll(respBody)
+	if err != nil {
+		return err
+	}
+
+	zipReader, err := zip.NewReader(bytes.NewReader(zipRespBody), int64(len(zipRespBody)))
 	if err != nil {
 		return err
 	}
@@ -502,6 +502,13 @@ func unZIP(ctx context.Context, dst, cliName string, r []byte) error {
 				return fmt.Errorf("%s: illegal file path", target)
 			}
 
+			// using Uint instead of int
+			maxFileSize := viper.GetUint64(config.DefaultMaxFileSizeKey)
+			// Fix G110 max size of a unpacked file, still don't take memory in to consideration but it shouldn't fil your disk to much
+			if f.UncompressedSize64 > maxFileSize {
+				return fmt.Errorf("%v: is %v which is bigger than allowed maxFileSize %v byte", cleanHeader, f.UncompressedSize64, maxFileSize)
+			}
+
 			outFile, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode()) // #nosec G304
 			if err != nil {
 				return err
@@ -512,7 +519,7 @@ func unZIP(ctx context.Context, dst, cliName string, r []byte) error {
 				return err
 			}
 
-			_, err = io.Copy(outFile, rc)
+			_, err = io.Copy(outFile, rc) // #nosec G110
 			if err != nil {
 				return err
 			}

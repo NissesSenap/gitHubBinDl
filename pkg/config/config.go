@@ -31,11 +31,13 @@ type Bin struct {
 
 // Items config file struct
 type Items struct {
-	Bins         []Bin  `yaml:"bins"`
-	GitHubAPIkey string `yaml:"githubAPIkey"`
-	HTTPtimeout  int    `yaml:"httpTimeout"`
-	HTTPinsecure bool   `yaml:"httpInsecure"`
-	SaveLocation string `yaml:"saveLocation"`
+	Bins                []Bin    `yaml:"bins"`
+	GitHubAPIkey        string   `yaml:"githubAPIkey"`
+	HTTPtimeout         int      `yaml:"httpTimeout"`
+	HTTPinsecure        bool     `yaml:"httpInsecure"`
+	SaveLocation        string   `yaml:"saveLocation"`
+	MaxFileSize         int64    `yaml:"maxFileSize"`
+	NotOkCompletionArgs []string `yaml:"notOkCompletionArgs"`
 }
 
 // default Keys & values for global values lik saveLocation & HttpTimeout, notice that only the keys are Global
@@ -54,6 +56,12 @@ const (
 
 	DefaultSaveLocationKey = "saveLocation"
 	// defaultSaveLocationValue is defined in ManageConfig()
+
+	DefaultMaxFileSizeKey   = "maxFileSize"
+	defaultMaxFileSizeValue = int64(104857600) //1024*1024*100 aka 100 Mb
+
+	DefaultNotOkCompletionArgsKey = "notOkCompletionArgs"
+	//defaultNotOkCompletionArgsValue is defined in ManageConfig()
 )
 
 // ManageConfig read all the user input and returns Items
@@ -67,6 +75,7 @@ func ManageConfig(ctx context.Context) (Items, error) {
 		return item, err
 	}
 	defaultSaveLocationValue := filepath.Join(homedir, "gitGubBinDL"+"_"+time.Now().Local().Format(util.DateFormat))
+	var defaultNotOkCompletionArgsValue = []string{"sudo", "rm", "ln", "sed", "awk", "|", "&"}
 
 	//var filename string
 	err = readCli()
@@ -80,6 +89,8 @@ func ManageConfig(ctx context.Context) (Items, error) {
 	viper.SetDefault(DefaultHTTPtimeoutkey, defaultHTTPtimeoutValue)
 	viper.SetDefault(DefaultHTTPinsecureKey, defaultHTTPinsecureValue)
 	viper.SetDefault(DefaultSaveLocationKey, defaultSaveLocationValue)
+	viper.SetDefault(DefaultMaxFileSizeKey, defaultMaxFileSizeValue)
+	viper.SetDefault(DefaultNotOkCompletionArgsKey, defaultNotOkCompletionArgsValue)
 
 	// Run initial to look if env FILE exists to manage the config
 	viper.AutomaticEnv()
