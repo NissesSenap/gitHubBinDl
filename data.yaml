@@ -3,6 +3,10 @@
 httpTimeout: 5
 httpInsecure: false
 saveLocation: /tmp/tkn-210102
+# maxFileSize: 104857600
+#notOkCompletionArgs:
+#  - sudo
+#  - "|"
 
 bins:
   - cli: tkn

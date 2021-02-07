@@ -40,11 +40,13 @@ data.yaml supports the following values:
 
 | Config         | Comment    | Example  | Default |
 | -------------- | :----------| :------- | -------: |
-| githubAPIkey   | Your github API key | myAPIkey | "" |
-| httpTimeout    | The http timeout in seconds | 5 | 5 |
-| httpInsecure   | Allow https without verified certificate | true | false |
-| saveLocation   | Where your binary files will be saved | /usr/local/bin | $HOME/gitGubBinDL_\<todays date\> |
-| bins           | A list of binaries to download | see bellow | ""|
+| githubAPIkey        | Your github API key         | myAPIkey | "" |
+| httpTimeout         | The http timeout in seconds | 5 | 5 |
+| httpInsecure        | Allow https without verified certificate | true | false |
+| saveLocation        | Where your binary files will be saved | /usr/local/bin | $HOME/gitGubBinDL_\<todays date\> |
+| maxFileSize         | The max file size that is allowed to be unpacked from a zip/tar.gz archive in bytes, 1024\*1024\*\<Mb\>| 67108864 | 104857600 |
+| notOkCompletionArgs | A list of commands that is not allowed to be provided to the completionArgs| []string{"sudo", "rm"} | []string{"sudo", "rm", "ln", "sed", "awk", "|", "&"} |
+| bins                | A list of binaries to download | see bellow | ""|
 
 What values you can have under bin:
 

@@ -234,17 +234,33 @@ func copyOldCli(cliName, saveLocation string) error {
 }
 
 // copyFileContents actually performs the copy and uses the existing FileMode to set the old one
-func copyFileContents(target, dst string, srcStat os.FileMode) error {
-	in, err := os.Open(target)
+func copyFileContents(target, dst string, srcStat os.FileMode) (err error) {
+	in, err := os.Open(target) // #nosec G304
 	if err != nil {
 		return err
 	}
-	defer in.Close()
+
+	// Instead of defer in.Close() that doesent look for the error of os.Close use a defer wrapper and return using named variable
+	// A bit to magical but I don't have to remember if i did the close on the correct place or not.
+	// https://www.joeshaw.org/dont-defer-close-on-writable-files/
+	defer func() {
+		cerr := in.Close()
+		if err == nil {
+			err = cerr
+		}
+	}()
+
 	out, err := os.Create(dst)
 	if err != nil {
 		return err
 	}
-	defer out.Close()
+
+	defer func() {
+		cerr := out.Close()
+		if err == nil {
+			err = cerr
+		}
+	}()
 
 	err = os.Chmod(dst, srcStat)
 	if err != nil {
@@ -277,11 +293,7 @@ func pickExtension(ctx context.Context, respBody io.ReadCloser, cliName, saveLoc
 		}
 		return nil
 	case zipExtension:
-		zipRespBody, err := ioutil.ReadAll(respBody)
-		if err != nil {
-			return err
-		}
-		err = unZIP(ctx, saveLocation, cliName, zipRespBody)
+		err := unZIP(ctx, saveLocation, cliName, respBody)
 		if err != nil {
 			return err
 		}
@@ -308,7 +320,10 @@ func saveFile(ctx context.Context, dst, cliName string, rc io.Reader) error {
 	}
 
 	target := filepath.Join(dst, cliName)
-	f, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.FileMode(0755))
+	if !strings.HasPrefix(target, filepath.Clean(dst)+string(os.PathSeparator)) {
+		return fmt.Errorf("%s: illegal file path", target)
+	}
+	f, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.FileMode(0755)) // #nosec G304
 	if err != nil {
 		return err
 	}
@@ -328,7 +343,18 @@ func saveFile(ctx context.Context, dst, cliName string, rc io.Reader) error {
 // saveCompletion runs the completionCommand and saves the output in a file
 func saveCompletion(ctx context.Context, cliLocation, cliName, completionLocation string, completionCommand []string) error {
 	log := logr.FromContext(ctx)
-	command := exec.Command(filepath.Join(cliLocation, cliName))
+
+	// check to see if the provided completion command contain any potentially dangerous commands
+	for _, commands := range completionCommand {
+		for _, noCommands := range viper.GetStringSlice(config.DefaultNotOkCompletionArgsKey) {
+			if commands == noCommands {
+				return fmt.Errorf("completionArg %v, contains non ok provided command: %v", commands, noCommands)
+			}
+		}
+	}
+
+	// Ignoring G204, trying to mitigate it as much as possible by going through non ok commands before running the command
+	command := exec.Command(filepath.Join(cliLocation, cliName)) // #nosec G204
 
 	// Instead of using a for loop with append you can use ... to unpack the list S1011
 	command.Args = append(command.Args, completionCommand...)
@@ -343,7 +369,7 @@ func saveCompletion(ctx context.Context, cliLocation, cliName, completionLocatio
 	}
 	log.Info("Managed to run completion command")
 
-	f, err := os.OpenFile(completionLocation, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.FileMode(0755))
+	f, err := os.OpenFile(completionLocation, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.FileMode(0755)) // #nosec G304
 	if err != nil {
 		return err
 	}
@@ -412,35 +438,53 @@ func untarGZ(ctx context.Context, dst, cliName string, r io.Reader) error {
 		case tar.TypeReg:
 			// Only write the cliFile
 			if cleanHeader == cliName {
+				if !strings.HasPrefix(target, filepath.Clean(dst)+string(os.PathSeparator)) {
+					return fmt.Errorf("%s: illegal file path", target)
+				}
 
+				maxFileSize := viper.GetInt64(config.DefaultMaxFileSizeKey)
+				// Fix G110 max size of a unpacked file, still don't take memory in to consideration but it shouldn't fil your disk to much
+				//gitHubAPIkey := viper.GetString(config.DefaultGITHUBAPIKEYKey)
+				if header.Size > maxFileSize {
+					return fmt.Errorf("%v: is %v which is bigger than allowed maxFileSize %v byte", cleanHeader, header.Size, maxFileSize)
+				}
 				// TODO change to some debug...
 				log.Info(cleanHeader)
 				/* Since I only untar the cli it self I enforce 0755
 				   else use os.FileMode(header.Mode) to get what the filed had when it was tared.
 				*/
-				file, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(0755))
+				file, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(0755)) // #nosec G304
 				if err != nil {
 					return err
 				}
 
 				// copy over contents
+				/* #nosec G110*/
 				if _, err := io.Copy(file, tr); err != nil {
 					return err
 				}
 
 				// manually close here after each file operation; defering would cause each file close
 				// to wait until all operations have completed.
-				file.Close()
+				err = file.Close()
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
 }
 
 // unZIP unzip files and put the result in any folder you want
-func unZIP(ctx context.Context, dst, cliName string, r []byte) error {
+func unZIP(ctx context.Context, dst, cliName string, respBody io.Reader) error {
 	log := logr.FromContext(ctx)
 
-	zipReader, err := zip.NewReader(bytes.NewReader(r), int64(len(r)))
+	zipRespBody, err := ioutil.ReadAll(respBody)
+	if err != nil {
+		return err
+	}
+
+	zipReader, err := zip.NewReader(bytes.NewReader(zipRespBody), int64(len(zipRespBody)))
 	if err != nil {
 		return err
 	}
@@ -458,7 +502,14 @@ func unZIP(ctx context.Context, dst, cliName string, r []byte) error {
 				return fmt.Errorf("%s: illegal file path", target)
 			}
 
-			outFile, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+			// using Uint instead of int
+			maxFileSize := viper.GetUint64(config.DefaultMaxFileSizeKey)
+			// Fix G110 max size of a unpacked file, still don't take memory in to consideration but it shouldn't fil your disk to much
+			if f.UncompressedSize64 > maxFileSize {
+				return fmt.Errorf("%v: is %v which is bigger than allowed maxFileSize %v byte", cleanHeader, f.UncompressedSize64, maxFileSize)
+			}
+
+			outFile, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode()) // #nosec G304
 			if err != nil {
 				return err
 			}
@@ -468,11 +519,21 @@ func unZIP(ctx context.Context, dst, cliName string, r []byte) error {
 				return err
 			}
 
-			_, err = io.Copy(outFile, rc)
+			_, err = io.Copy(outFile, rc) // #nosec G110
+			if err != nil {
+				return err
+			}
 
 			// Close the file without defer to close before next iteration of loop
-			outFile.Close()
-			rc.Close()
+			err = outFile.Close()
+			if err != nil {
+				return err
+			}
+
+			err = rc.Close()
+			if err != nil {
+				return err
+			}
 
 			if err != nil {
 				return err
