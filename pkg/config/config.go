@@ -22,7 +22,6 @@ type Bin struct {
 	Repo               string   `yaml:"repo"`
 	Tag                string   `yaml:"tag"`
 	Match              string   `yaml:"match"`
-	BaseURL            string   `yaml:"baseURL"`
 	Download           bool     `yaml:"download"`
 	NonGithubURL       string   `yaml:"nonGithubURL"`
 	Backup             bool     `yaml:"backup"`
@@ -37,6 +36,8 @@ type Items struct {
 	HTTPtimeout         int      `yaml:"httpTimeout"`
 	HTTPinsecure        bool     `yaml:"httpInsecure"`
 	SaveLocation        string   `yaml:"saveLocation"`
+	BaseURL             string   `yaml:"baseURL"`
+	UploadURL           string   `yaml:"uploadURL"`
 	MaxFileSize         int64    `yaml:"maxFileSize"`
 	NotOkCompletionArgs []string `yaml:"notOkCompletionArgs"`
 }
@@ -57,6 +58,9 @@ const (
 
 	DefaultSaveLocationKey = "saveLocation"
 	// defaultSaveLocationValue is defined in ManageConfig()
+
+	DefaultBaseURLKey  = "baseURL"
+	DefaultUploadRLKey = "uploadURL"
 
 	DefaultMaxFileSizeKey   = "maxFileSize"
 	defaultMaxFileSizeValue = int64(104857600) //1024*1024*100 aka 100 Mb
@@ -92,6 +96,9 @@ func ManageConfig(ctx context.Context) (Items, error) {
 	viper.SetDefault(DefaultSaveLocationKey, defaultSaveLocationValue)
 	viper.SetDefault(DefaultMaxFileSizeKey, defaultMaxFileSizeValue)
 	viper.SetDefault(DefaultNotOkCompletionArgsKey, defaultNotOkCompletionArgsValue)
+	viper.SetDefault(DefaultBaseURLKey, "")
+	viper.SetDefault(DefaultUploadRLKey, "")
+	viper.SetDefault(DefaultHTTPinsecureKey, defaultHTTPinsecureValue)
 
 	// Run initial to look if env FILE exists to manage the config
 	viper.AutomaticEnv()
