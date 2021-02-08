@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -113,6 +114,11 @@ func ManageConfig(ctx context.Context) (Items, error) {
 	err = viper.Unmarshal(&item)
 	if err != nil {
 		return item, err
+	}
+
+	// if item.Bins don't contain any items there is no point in running this cli
+	if len(item.Bins) < 1 {
+		return item, errors.New("The bin list contain no files to download, please update your config")
 	}
 
 	// run again to get the values from the config file like GITHUBAPIKEY
