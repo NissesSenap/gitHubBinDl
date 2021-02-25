@@ -33,6 +33,7 @@ import (
 const zipExtension = ".zip"
 const gzExtension = ".gz"
 const exeExtension = ".exe"
+const commandTimeout = 3
 
 // App start the app
 func App(ctx context.Context, httpClient *http.Client, configItem *config.Items) error {
@@ -353,8 +354,12 @@ func saveCompletion(ctx context.Context, cliLocation, cliName, completionLocatio
 		}
 	}
 
+	// add a timeout with the command
+	ctx, cancel := context.WithTimeout(ctx, commandTimeout*time.Second)
+	defer cancel()
+
 	// Ignoring G204, trying to mitigate it as much as possible by going through non ok commands before running the command
-	command := exec.Command(filepath.Join(cliLocation, cliName)) // #nosec G204
+	command := exec.CommandContext(ctx, filepath.Join(cliLocation, cliName)) // #nosec G204
 
 	// Instead of using a for loop with append you can use ... to unpack the list S1011
 	command.Args = append(command.Args, completionCommand...)
