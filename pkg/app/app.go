@@ -39,8 +39,22 @@ const commandTimeout = 3
 func App(ctx context.Context, httpClient *http.Client, configItem *config.Items) error {
 	log := logr.FromContext(ctx)
 
-	// TODO find a way to use configItem.Bins[0].BaseURL to download files from custom github endpoints
-	client := github.NewClient(nil)
+	client := github.NewClient(httpClient)
+
+	// since client is a pointer I can't have a baseURL for each endpoint without allot of logic
+	if configItem.BaseURL != "" && configItem.UploadURL != "" {
+		baseURL, err := url.Parse(configItem.BaseURL)
+		if err != nil {
+			return err
+		}
+		client.BaseURL = baseURL
+
+		uploadURL, err := url.Parse(configItem.UploadURL)
+		if err != nil {
+			return err
+		}
+		client.UploadURL = uploadURL
+	}
 
 	gitHubAPIkey := viper.GetString(config.DefaultGITHUBAPIKEYKey)
 	log.Info(gitHubAPIkey)
@@ -130,16 +144,6 @@ func downloadBin(ctx context.Context, wg *sync.WaitGroup, channel chan error, cl
 
 	var resp *github.RepositoryRelease
 	var er error
-
-	// check if BaseURL is empty, if not it will use that when talking to the github api
-	if binConfig.BaseURL != "" {
-		githubURL, err := url.Parse(binConfig.BaseURL)
-		if err != nil {
-			channel <- er
-			return
-		}
-		client.BaseURL = githubURL
-	}
 
 	// If tag is empty use GetReleaseByTag
 	if binConfig.Tag != "" {
