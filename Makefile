@@ -12,7 +12,7 @@ vet:
 test:
 	go test ./...
 
-build:
+build/linux:
 	GOOS=linux GOARCH=amd64 go build -ldflags '-extldflags "-static"' -o bin/githubbindl_linux_amd64 cmd/githubbindl/main.go
 	chmod +x bin/githubbindl_linux_amd64
 

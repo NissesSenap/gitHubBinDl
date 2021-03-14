@@ -14,7 +14,7 @@ jobs:
           go-version: 1.13
       - name: build
         run: |
-          make build
+          make build/linux
           make build/windows
           make build/mac
       - name: release
